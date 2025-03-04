@@ -1,0 +1,9 @@
+*.egg-info
+*.egg
+*.pyc
+*.pyo
+__pycache__
+build/
+.gitignore
+
+tests/

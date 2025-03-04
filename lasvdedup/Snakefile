@@ -1,21 +1,13 @@
-configfile: "config.yaml"
 
-# Accept command line parameters with defaults from config
-CONTIGS_TABLE = config.get("contigs_table", "")
-SEQ_DATA_DIR = config.get("seq_data_dir", "")
+# Accept configuration parameters
+CONTIGS_TABLE = config["CONTIGS_TABLE"]
+SEQ_DATA_DIR = config["SEQ_DATA_DIR"]
+BASE_DATA_DIR = config["BASE_DATA_DIR"]
+SEGMENTS = config["SEGMENTS"]
 
-# Override with command line parameters if provided
-if workflow.overwrite_config:
-    if "contigs_table" in workflow.overwrite_config:
-        CONTIGS_TABLE = workflow.overwrite_config["contigs_table"]
-    if "seq_data_dir" in workflow.overwrite_config:
-        SEQ_DATA_DIR = workflow.overwrite_config["seq_data_dir"]
-
-SEGMENTS = config["segments"]
-
-# Validate required parameters
-if not CONTIGS_TABLE or not SEQ_DATA_DIR:
-    raise ValueError("Missing required parameters: contigs_table and/or seq_data_dir")
+# Define reference files to download if not present
+REFERENCE_FILES = [f"LASV-{segment}.aln" for segment in SEGMENTS] + \
+                  [f"LASV-{segment}.treefile" for segment in SEGMENTS]
 
 rule all:
     input:
@@ -47,12 +39,13 @@ rule extract_sequences:
         "raw/lasv-{segment}.denovo.fasta"
     input:
         contigs=CONTIGS_TABLE,
+        seq_data_dir=SEQ_DATA_DIR,
         dir="raw"
     shell:
         """
         csvtk -t filter2 -f '${{(annotation) acronym}}=="LASV" && ${{(annotation) segment}}=="{wildcards.segment}"' {input.contigs} | \
         cut -f1 | grep -v "_consensus" | \
-        xargs -I @ find {SEQ_DATA_DIR} -name "*@*" -type f -exec cat {{}} + > {output}
+        xargs -I @ find {input.seq_data_dir} -name "*@*" -type f -exec cat {{}} + > {output}
         """
 
 rule align_sequences:
@@ -62,7 +55,7 @@ rule align_sequences:
         sequences="raw/lasv-{segment}.denovo.fasta",
         base_aln="raw/lasv-base-{segment}.aln"
     params:
-        threads=config["mafft"]["threads"]
+        threads=config["MAFFT"]["THREADS"]
     shell:
         """
         mafft --add {input.sequences} --adjustdirection --thread {params.threads} {input.base_aln} > {output}
@@ -86,8 +79,8 @@ rule build_tree:
         alignment="lasv-{segment}.denovo.trimal.aln",
         outdir="iqtree-out"
     params:
-        model=config["iqtree"]["model"],
-        bootstrap=config["iqtree"]["bootstraps"],
+        model=config["IQTREE"]["MODEL"],
+        bootstrap=config["IQTREE"]["BOOTSTRAPS"],
         prefix="iqtree-out/lasv-{segment}.denovo.trimal"
     threads: workflow.cores
     shell:

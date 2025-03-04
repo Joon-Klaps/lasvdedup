@@ -1,0 +1,24 @@
+# Input paths - these can be overridden via command line
+CONTIGS_TABLE: ""  # Default empty, should be provided at runtime
+SEQ_DATA_DIR: ""   # Default empty, should be provided at runtime
+BASE_DATA_DIR: "https://raw.githubusercontent.com/Joon-Klaps/lasvdedup/refs/heads/main/lasvdedup/data/"
+WORKDIR: "."       # Working directory for Snakemake
+
+# Parallelization settings
+THREADS: 4        # Default threads for the whole pipeline
+
+# Analysis parameters
+SEGMENTS:
+  - "L"
+  - "S"
+
+# Tool-specific parameters
+MAFFT:
+  THREADS: 5
+
+IQTREE:
+  MODEL: "GTR+F+I+I+R8"
+  BOOTSTRAPS: 1000
+
+# Sequence analysis settings
+DISTANCE_THRESHOLD: 3.0  # Number of standard deviations above the mean to consider as outlier
