@@ -23,7 +23,8 @@ def parse_args():
                       help='Directory containing sequence data')
     parser.add_argument('--ref-dir', '--base-data-dir', dest='base_data_dir',
                       help='Base URL or path for reference data')
-    parser.add_argument('--workdir', '-w', help='Working directory', default='.')
+    parser.add_argument('--outdir', '-o', help='Output directory')
+    parser.add_argument('--workdir', '-w', help='Working directory')
     parser.add_argument('--config', '-c', help='Path to config file')
     parser.add_argument('--threads', '-t', type=int, help='Number of threads to use')
     parser.add_argument('--force', '-f', action='store_true', help='Force rerun all jobs')
@@ -80,6 +81,9 @@ def build_config(args):
 
     if args.force:
         cli_overrides['FORCE'] = True
+
+    if args.outdir:
+        cli_overrides['OUTDIR'] =  os.path.abspath(args.outdir)
 
     # Update config with CLI overrides
     config.update(cli_overrides)

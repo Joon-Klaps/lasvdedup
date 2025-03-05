@@ -6,7 +6,6 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "snakemake>=7.0.0",
         "pyyaml>=6.0",
     ],
     entry_points={

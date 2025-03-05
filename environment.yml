@@ -5,8 +5,9 @@ channels:
   - defaults
 dependencies:
   - python>=3.7
+  - snakemake-minimal=7.32
   - mafft
-  - iqtree
+  - iqtree>=2.1
   - trimal
   - csvtk
   - wget

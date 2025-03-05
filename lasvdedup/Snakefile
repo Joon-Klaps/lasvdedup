@@ -1,9 +1,9 @@
-
 # Accept configuration parameters
 CONTIGS_TABLE = config["CONTIGS_TABLE"]
 SEQ_DATA_DIR = config["SEQ_DATA_DIR"]
 BASE_DATA_DIR = config["BASE_DATA_DIR"]
 SEGMENTS = config["SEGMENTS"]
+OUTDIR = config["OUTDIR"]
 
 # Define reference files to download if not present
 REFERENCE_FILES = [f"LASV-{segment}.aln" for segment in SEGMENTS] + \
@@ -11,38 +11,54 @@ REFERENCE_FILES = [f"LASV-{segment}.aln" for segment in SEGMENTS] + \
 
 rule all:
     input:
-        expand("iqtree-out/lasv-{segment}.denovo.trimal.renamed.treefile", segment=SEGMENTS)
+        # expand("{OUTDIR}/raw/lasv-base-{segment}.aln", segment=SEGMENTS, OUTDIR=OUTDIR)
+        # expand("{OUTDIR}/lasv-{segment}.denovo.trimal.aln", segment=SEGMENTS, OUTDIR=OUTDIR)
+        expand("{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile", segment=SEGMENTS, OUTDIR=OUTDIR)
 
-rule prepare_directories:
+rule prepare_base_files:
     output:
-        directory("raw"),
-        directory("iqtree-out")
+        alignments="{OUTDIR}/raw/lasv-base-{segment}.aln",
+        trees="{OUTDIR}/raw/lasv-base-{segment}.treefile"
+    params:
+        base_dir = BASE_DATA_DIR
     shell:
         """
-        mkdir -p {output}
-        """
+        mkdir -p {OUTDIR}/raw
+        echo "Processing segment {wildcards.segment} from {params.base_dir}"
 
-rule prepare_base_alignments:
-    output:
-        "raw/lasv-base-{segment}.aln"
-    input:
-        "raw"
-    shell:
-        """
-        touch {output}
-        # Note: Copy your existing base alignments here or modify this rule
-        # cp /path/to/your/base/alignment/{wildcards.segment}.aln {output}
+        if [[ "{params.base_dir}" == http* ]]; then
+            # If BASE_DATA_DIR is a URL, download the file
+            echo "Downloading alignment file for {wildcards.segment}..."
+            wget -O {output.alignments} "{params.base_dir}/LASV-{wildcards.segment}.aln" || \
+            curl -o {output.alignments} "{params.base_dir}/LASV-{wildcards.segment}.aln" || \
+            (echo "Failed to download {wildcards.segment} alignment file" && exit 1)
+            echo "Alignment download complete."
+
+            echo "Downloading tree file for {wildcards.segment}..."
+            wget -O {output.trees} "{params.base_dir}/LASV-{wildcards.segment}.treefile" || \
+            curl -o {output.trees} "{params.base_dir}/LASV-{wildcards.segment}.treefile" || \
+            (echo "Failed to download {wildcards.segment} tree file" && exit 1)
+            echo "Tree download complete."
+        else
+            # If BASE_DATA_DIR is a local path, copy the file
+            cp "{params.base_dir}/LASV-{wildcards.segment}.aln" {output.alignments} || \
+            (echo "Failed to copy {wildcards.segment} alignment file" && exit 1)
+
+            cp "{params.base_dir}/LASV-{wildcards.segment}.treefile" {output.trees} || \
+            (echo "Failed to copy {wildcards.segment} tree file" && exit 1)
+        fi
+        echo "Processing for segment {wildcards.segment} completed successfully."
         """
 
 rule extract_sequences:
     output:
-        "raw/lasv-{segment}.denovo.fasta"
+        "{OUTDIR}/raw/lasv-{segment}.denovo.fasta"
     input:
         contigs=CONTIGS_TABLE,
         seq_data_dir=SEQ_DATA_DIR,
-        dir="raw"
     shell:
         """
+        mkdir -p {OUTDIR}/raw
         csvtk -t filter2 -f '${{(annotation) acronym}}=="LASV" && ${{(annotation) segment}}=="{wildcards.segment}"' {input.contigs} | \
         cut -f1 | grep -v "_consensus" | \
         xargs -I @ find {input.seq_data_dir} -name "*@*" -type f -exec cat {{}} + > {output}
@@ -50,10 +66,10 @@ rule extract_sequences:
 
 rule align_sequences:
     output:
-        "lasv-{segment}.denovo.aln"
+        "{OUTDIR}/lasv-{segment}.add.denovo.aln"
     input:
-        sequences="raw/lasv-{segment}.denovo.fasta",
-        base_aln="raw/lasv-base-{segment}.aln"
+        sequences="{OUTDIR}/raw/lasv-{segment}.denovo.fasta",
+        base_aln="{OUTDIR}/raw/lasv-base-{segment}.aln"
     params:
         threads=config["MAFFT"]["THREADS"]
     shell:
@@ -63,9 +79,9 @@ rule align_sequences:
 
 rule trim_alignment:
     output:
-        "lasv-{segment}.denovo.trimal.aln"
+        "{OUTDIR}/lasv-{segment}.denovo.trimal.aln"
     input:
-        "lasv-{segment}.denovo.aln"
+        "{OUTDIR}/lasv-{segment}.add.denovo.aln"
     shell:
         """
         trimal -in {input} -out {output} -automated1
@@ -73,28 +89,29 @@ rule trim_alignment:
 
 rule build_tree:
     output:
-        tree="iqtree-out/lasv-{segment}.denovo.trimal.treefile",
-        log="iqtree-out/lasv-{segment}.denovo.trimal.log"
+        tree="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile",
+        log="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.log"
     input:
-        alignment="lasv-{segment}.denovo.trimal.aln",
-        outdir="iqtree-out"
+        alignment="{OUTDIR}/lasv-{segment}.denovo.trimal.aln",
+        tree="{OUTDIR}/raw/lasv-base-{segment}.treefile"
     params:
         model=config["IQTREE"]["MODEL"],
         bootstrap=config["IQTREE"]["BOOTSTRAPS"],
-        prefix="iqtree-out/lasv-{segment}.denovo.trimal"
+        prefix="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal"
     threads: workflow.cores
     shell:
         """
-        iqtree -m {params.model} -B {params.bootstrap} -T {threads} -redo -s {input.alignment} \
-        -pre {params.prefix} > {output.log} 2>&1
+        mkdir -p {OUTDIR}/iqtree-out/
+        iqtree -m {params.model} -B {params.bootstrap} -T {threads} -g {input.tree} -redo -s {input.alignment} \
+        -pre {params.prefix}
         """
 
-rule rename_tree:
-    output:
-        "iqtree-out/lasv-{segment}.denovo.trimal.renamed.treefile"
-    input:
-        "iqtree-out/lasv-{segment}.denovo.trimal.treefile"
-    shell:
-        """
-        sed -e 's/\.consensus_ivar//g' -e 's/_R_//g' -e 's/|/\//g' {input} > {output}
-        """
+# rule rename_tree:
+#     output:
+#         "{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.renamed.treefile"
+#     input:
+#         "{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile"
+#     shell:
+#         """
+#         sed -e 's/\.consensus_ivar//g' -e 's/_R_//g' -e 's/|/\//g' {input} > {output}
+#         """

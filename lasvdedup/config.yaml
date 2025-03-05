@@ -2,7 +2,8 @@
 CONTIGS_TABLE: ""  # Default empty, should be provided at runtime
 SEQ_DATA_DIR: ""   # Default empty, should be provided at runtime
 BASE_DATA_DIR: "https://raw.githubusercontent.com/Joon-Klaps/lasvdedup/refs/heads/main/lasvdedup/data/"
-WORKDIR: "."       # Working directory for Snakemake
+OUTDIR: "lasvdedup-out"  # Default output directory
+WORKDIR: ".work"       # Working directory for Snakemake
 
 # Parallelization settings
 THREADS: 4        # Default threads for the whole pipeline

@@ -34,6 +34,7 @@ def run_pipeline(config, dry_run=False):
         'dryrun': dry_run,
         'printshellcmds': True,
         'workdir': workdir,
+
     }
 
     try:
