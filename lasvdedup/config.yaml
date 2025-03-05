@@ -17,7 +17,7 @@ MAFFT:
   THREADS: 5
 
 IQTREE:
-  MODEL: "GTR+F+I+I+R8"
+  MODEL: "MFP"
   BOOTSTRAPS: 1000
 
 # Sequence analysis settings
