@@ -58,6 +58,8 @@ def build_config(args):
 
     # Update paths to absolute paths
     contigs_table = os.path.abspath(args.contigs_table)
+    if not os.path.isfile(contigs_table):
+        raise FileNotFoundError(f"Contigs table not found: {contigs_table}")
 
     # Infer seq_data_dir if not provided
     if not args.seq_data_dir:
@@ -65,6 +67,9 @@ def build_config(args):
         print(f"Sequence data directory not specified, using: {seq_data_dir}")
     else:
         seq_data_dir = os.path.abspath(args.seq_data_dir)
+
+    if not os.path.isdir(seq_data_dir):
+        raise FileNotFoundError(f"Sequence data directory not found: {seq_data_dir}")
 
     # Override config with CLI arguments
     cli_overrides = {
