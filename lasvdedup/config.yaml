@@ -22,4 +22,7 @@ IQTREE:
   BOOTSTRAPS: 1000
 
 # Sequence analysis settings
-DISTANCE_THRESHOLD: 3.0  # Number of standard deviations above the mean to consider as outlier
+DEDUPLICATE:
+  SAMPLE_REGEX: "LVE[0-9]{5}"
+  READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
+  DISTANCE_THRESHOLD: 3.0  # Number of standard deviations above the mean to consider as outlier

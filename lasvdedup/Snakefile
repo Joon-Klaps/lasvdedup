@@ -1,30 +1,18 @@
 #!/usr/bin/env python
 
-from .utils import determine_duplicates
-
-# Accept configuration parameters
-CONTIGS_TABLE = config["CONTIGS_TABLE"]
-SEQ_DATA_DIR = config["SEQ_DATA_DIR"]
-BASE_DATA_DIR = config["BASE_DATA_DIR"]
-SEGMENTS = config["SEGMENTS"]
-OUTDIR = config["OUTDIR"]
-
-# # Define reference files to download if not present
-# REFERENCE_FILES = [f"LASV-{segment}.aln" for segment in SEGMENTS] + \
-#                   [f"LASV-{segment}.treefile" for segment in SEGMENTS]
+from lasvdedup.utils import determine_duplicates
 
 rule all:
     input:
-        # expand("{OUTDIR}/raw/lasv-base-{segment}.aln", segment=SEGMENTS, OUTDIR=OUTDIR)
-        # expand("{OUTDIR}/lasv-{segment}.denovo.trimal.aln", segment=SEGMENTS, OUTDIR=OUTDIR)
-        expand("{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile", segment=SEGMENTS, OUTDIR=OUTDIR)
+        trees=expand("{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile", segment=config["SEGMENTS"], OUTDIR=config["OUTDIR"]),
+        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt", segment=config["SEGMENTS"], OUTDIR=config["OUTDIR"])
 
 rule prepare_base_files:
     output:
         alignments="{OUTDIR}/raw/lasv-base-{segment}.aln",
         trees="{OUTDIR}/raw/lasv-base-{segment}.treefile"
     params:
-        base_dir = BASE_DATA_DIR
+        base_dir=config["BASE_DATA_DIR"]
     shell:
         """
         mkdir -p {OUTDIR}/raw
@@ -58,8 +46,8 @@ rule extract_sequences:
     output:
         "{OUTDIR}/raw/lasv-{segment}.denovo.fasta"
     input:
-        contigs=CONTIGS_TABLE,
-        seq_data_dir=SEQ_DATA_DIR,
+        contigs=config["CONTIGS_TABLE"],
+        seq_data_dir=config["SEQ_DATA_DIR"],
     shell:
         """
         mkdir -p {OUTDIR}/raw
@@ -70,25 +58,25 @@ rule extract_sequences:
 
 rule align_sequences:
     output:
-        "{OUTDIR}/lasv-{segment}.add.denovo.aln"
+        aln="{OUTDIR}/lasv-{segment}.add.denovo.aln"
     input:
-        sequences="{OUTDIR}/raw/lasv-{segment}.denovo.fasta",
-        base_aln="{OUTDIR}/raw/lasv-base-{segment}.aln"
+        sequences=rules.extract_sequences.output[0],
+        base_aln=rules.prepare_base_files.output.alignments
     params:
         threads=config["MAFFT"]["THREADS"]
     shell:
         """
-        mafft --add {input.sequences} --adjustdirection --thread {params.threads} {input.base_aln} > {output}
+        mafft --add {input.sequences} --adjustdirection --thread {params.threads} {input.base_aln} > {output.aln}
         """
 
 rule trim_alignment:
     output:
-        "{OUTDIR}/lasv-{segment}.denovo.trimal.aln"
+        aln="{OUTDIR}/lasv-{segment}.denovo.trimal.aln"
     input:
-        "{OUTDIR}/lasv-{segment}.add.denovo.aln"
+        rules.align_sequences.output.aln
     shell:
         """
-        trimal -in {input} -out {output} -automated1
+        trimal -in {input} -out {output.aln} -automated1
         """
 
 rule build_tree:
@@ -96,8 +84,8 @@ rule build_tree:
         tree="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile",
         log="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.log"
     input:
-        alignment="{OUTDIR}/lasv-{segment}.denovo.trimal.aln",
-        tree="{OUTDIR}/raw/lasv-base-{segment}.treefile"
+        alignment=rules.trim_alignment.output.aln,
+        base_tree=rules.prepare_base_files.output.trees
     params:
         model=config["IQTREE"]["MODEL"],
         bootstrap=config["IQTREE"]["BOOTSTRAPS"],
@@ -106,10 +94,9 @@ rule build_tree:
     shell:
         """
         mkdir -p {OUTDIR}/iqtree-out/
-        iqtree -m {params.model} -B {params.bootstrap} -T {threads} -g {input.tree} -redo -s {input.alignment} \
+        iqtree -m {params.model} -B {params.bootstrap} -T {threads} -g {input.base_tree} -redo -s {input.alignment} \
         -pre {params.prefix}
         """
-
 
 rule determine_duplicates:
     output:
@@ -117,18 +104,21 @@ rule determine_duplicates:
         bad_seqs="{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt",
         good_seqs="{OUTDIR}/dedup/lasv-{segment}.good_seqs.txt"
     input:
-        tree="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile",
-        alignment="{OUTDIR}/lasv-{segment}.denovo.trimal.aln"
+        tree=rules.build_tree.output.tree,
+        alignment=rules.trim_alignment.output.aln,
+        table=config["CONTIGS_TABLE"]
+    params:
+        prefix="{OUTDIR}/dedup/lasv-{segment}",
+        sample_regex=config["DEDUPLICATE"]["SAMPLE_REGEX"],
+        threshold=config["DEDUPLICATE"]["THRESHOLD"],
+        reads_column=config["DEDUPLICATE"]["READS_COLUMN"]
     run:
-        determine_duplicates(tree=input.tree, alignment=input.alignment, mldist=output.mldist,
-                             bad_seqs=output.bad_seqs, good_seqs=output.good_seqs)
-
-# rule rename_tree:
-#     output:
-#         "{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.renamed.treefile"
-#     input:
-#         "{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile"
-#     shell:
-#         """
-#         sed -e 's/\.consensus_ivar//g' -e 's/_R_//g' -e 's/|/\//g' {input} > {output}
-#         """
+        determine_duplicates(
+            tree=input.tree,
+            alignment=input.alignment,
+            prefix=params.prefix,
+            table=input.table,
+            sample_regex=params.sample_regex,
+            threshold=params.threshold,
+            reads_column=params.reads_column,
+            )
