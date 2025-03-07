@@ -11,3 +11,4 @@ lasvdedup-out/
 raw/
 .snakemake
 iqtree-out/
+.pytest_cache/

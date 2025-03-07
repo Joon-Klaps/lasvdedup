@@ -1,23 +1,34 @@
-# lasvdedup
+# LASV Deduplication Pipeline
 
-A small utility to deduplicate LASV consensus genomes from the pipeline [viralgenie](https://github.com/Joon-Klaps/viralgenie).
+![Python Tests](https://github.com/Joon-Klaps/lasv-deduplicate/actions/workflows/python-tests.yml/badge.svg)
+![Conda Test](https://github.com/Joon-Klaps/lasv-deduplicate/actions/workflows/conda-test.yml/badge.svg)
+
+A small snakemake pet project for deduplicating LASV (Lassa virus) sequences, from the output of the [viralgenie pipeline](https://github.com/Joon-Klaps/viralgenie)
 
 ## Installation
 
 ```bash
-git clone https://github.com/Joon-Klaps/lasvdedup.git
-cd lasvdedup
-```
+# Installation with pip
+pip install -e .
 
-```bash
+# Or using conda
 conda env create -f environment.yml
-conda activate lasvdedup
+conda activate lasvdedup-env
+pip install -e .
 ```
-
 
 ## Usage
 
 ```bash
-lasvdedup --contigs viralgenie/overview-tables/contigs_overview.tsv --seq-dir viralgenie/consensus/seq
+# Example command
+lasvdedup --help
+```
+
+## Development
+
+To run tests:
+
+```bash
+pytest tests/
 ```
 

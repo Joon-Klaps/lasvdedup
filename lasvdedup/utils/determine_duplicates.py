@@ -4,7 +4,6 @@ import os
 import re
 import pandas as pd
 import numpy as np
-import networkx as nx
 from pathlib import Path
 from Bio import Phylo
 from typing import Dict, Set, List, Tuple
@@ -13,25 +12,27 @@ from typing import Dict, Set, List, Tuple
 def to_distance_matrix(tree: Phylo.BaseTree.Tree) -> Tuple[List, np.ndarray]:
     """Create a distance matrix (NumPy array) from clades/branches in tree.
 
-    A cell (i,j) in the array is the length of the branch between allclades[i]
-    and allclades[j], if a branch exists, otherwise infinity.
+    A cell (i,j) in the array is the path distance between terminals[i]
+    and terminals[j], as calculated from the phylogenetic tree.
 
-    Returns a tuple of (allclades, distance_matrix) where allclades is a list of
-    clades and distance_matrix is a NumPy 2D array.
+    Returns a tuple of (terminals, distance_matrix) where terminals is a list of
+    terminal clades and distance_matrix is a NumPy array of distances.
     """
-    allclades = list(tree.find_clades(order="level"))
-    lookup = {}
-    for i, elem in enumerate(allclades):
-        lookup[elem] = i
-    distmat = np.repeat(np.inf, len(allclades) ** 2)
-    distmat.shape = (len(allclades), len(allclades))
-    for parent in tree.find_clades(terminal=False, order="level"):
-        for child in parent.clades:
-            if child.branch_length:
-                distmat[lookup[parent], lookup[child]] = child.branch_length
-    if not tree.rooted:
-        distmat += distmat.transpose
-    return (allclades, np.matrix(distmat))
+    terminals = tree.get_terminals()
+    n_terms = len(terminals)
+
+    # Initialize matrix with zeros
+    distmat = np.zeros((n_terms, n_terms))
+
+    # Fill matrix with pairwise distances
+    for i, t1 in enumerate(terminals):
+        for j, t2 in enumerate(terminals):
+            if i < j:  # Calculate each pair only once
+                dist = tree.distance(t1, t2)
+                distmat[i, j] = dist
+                distmat[j, i] = dist
+
+    return (terminals, distmat)
 
 def write_distance_matrix(dist_matrix: np.ndarray, terminals: List, output_path: str) -> None:
     """
@@ -113,7 +114,7 @@ def find_duplicates(
     dist_matrix: np.ndarray,
     contig_to_reads: Dict[str, int],
     threshold: float
-) -> Tuple[Set[str], Set[str]]:
+) -> Tuple[Set[str], Set[str], Set[str]]:
     """
     Process each sample group to identify duplicates.
 
@@ -127,6 +128,7 @@ def find_duplicates(
         Tuple containing:
         - Set of good sequences to keep
         - Set of bad sequences to discard
+        - Set of sequences with comorbidities
     """
     good_seqs = set()
     bad_seqs = set()
@@ -143,12 +145,12 @@ def find_duplicates(
         distances = get_distances(seq_names, tips_lookup, dist_matrix)
 
         # Consensus sequences are all similar
-        if all(distances <= threshold):
+        if all(d <= threshold for d in distances):  # Fixed: Check each distance individually
             reads = {seq: get_reads(seq, contig_to_reads) for seq in seq_names}
             # Keep sequence with highest read count
             max_reads_seq = max(reads, key=reads.get)
             good_seqs.add(max_reads_seq)
-            bad_seqs.update(seq_names - {max_reads_seq})
+            bad_seqs.update(set(seq_names) - {max_reads_seq})
         # Consensus sequences are distinct
         else:
             good_seqs.update(seq_names)
@@ -179,7 +181,7 @@ def get_distances(names: List , tips_lookup:Dict, matrix:np.ndarray) -> Dict[str
             distances.append(dist)
     return distances
 
-def get_reads (seq_name: str, contig_to_reads: Dict[str, int]) -> int:
+def get_reads (seq_name: str, contig_to_reads: Dict[str, Dict[str, int]]) -> int:
     """
     Get the number of reads for a given sequence.
 
@@ -188,9 +190,9 @@ def get_reads (seq_name: str, contig_to_reads: Dict[str, int]) -> int:
         contig_to_reads: Dictionary mapping contig IDs to read counts
     """
     if seq_name in contig_to_reads:
-        return contig_to_reads[seq_name]
-    elif f"_R_{seq_name}" in contig_to_reads:
-        return contig_to_reads[f"_R_{seq_name}"]
+        return contig_to_reads[seq_name]["reads"]
+    elif seq_name.replace('_R_','') in contig_to_reads:
+        return contig_to_reads[seq_name.replace('_R_','')]["reads"]
 
     raise ValueError(f"Read count not found for sequence: {seq_name}")
 
