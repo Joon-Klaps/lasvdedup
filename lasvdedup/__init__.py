@@ -1,2 +1,4 @@
-"""LASV deduplication pipeline package."""
+"""LASV deduplication package."""
+
+__version__ = "0.1.0"
 
