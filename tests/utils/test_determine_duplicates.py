@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+## I have little clue to what is going on here, 99% was written by claude 3.7 sonnet preview thinking.
 
 import os
 import pytest
@@ -6,7 +7,8 @@ import tempfile
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from Bio import Phylo
+from phylodm import PhyloDM
+from Bio import SeqIO
 from io import StringIO
 
 import lasvdedup.utils.determine_duplicates as dedup_module
@@ -20,23 +22,31 @@ from lasvdedup.utils.determine_duplicates import (
     get_distances,
     get_reads,
     write_results,
-    determine_duplicates
+    determine_duplicates,
+    root_tree_at_midpoint  # Add import for new function
 )
-
 
 # Fixtures for test data
 @pytest.fixture
 def example_tree():
     """Create a simple newick tree for testing."""
     tree_str = "(((A:0.1,B:0.2)Node1:0.3,C:0.4)Node2:0.5,D:0.6);"
-    handle = StringIO(tree_str)
-    return Phylo.read(handle, "newick")
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".tree", delete=False) as f:
+        f.write(tree_str)
+        filepath = f.name
+    try:
+        # Load and return the tree
+        yield PhyloDM.load_from_newick_path(filepath)
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(filepath):
+            os.unlink(filepath)
 
 
 @pytest.fixture
 def example_terminal_tips(example_tree):
     """Return terminal tips from the example tree."""
-    return list(example_tree.get_terminals())
+    return [l.replace(" ", "_") for l in example_tree.taxa()]
 
 
 @pytest.fixture
@@ -89,6 +99,18 @@ def contig_to_reads_mapping():
     }
 
 
+@pytest.fixture
+def example_sequences():
+    """Create sample SeqIO records for testing."""
+    seq_records = {
+        'sampleA_1': SeqIO.SeqRecord(seq='ACGT', id='sampleA_1', description=''),
+        'sampleA_2': SeqIO.SeqRecord(seq='ACTT', id='sampleA_2', description=''),
+        'sampleB_1': SeqIO.SeqRecord(seq='GCTA', id='sampleB_1', description=''),
+        'sampleB_2': SeqIO.SeqRecord(seq='GCAT', id='sampleB_2', description=''),
+    }
+    return seq_records
+
+
 # Tests for each function
 def test_to_distance_matrix(example_tree):
     """Test that to_distance_matrix creates correct matrix structure."""
@@ -98,20 +120,15 @@ def test_to_distance_matrix(example_tree):
     assert len(tips) > 0
     assert matrix.shape == (len(tips), len(tips))
 
-    # Check a few known distances
-    terminal_tips = example_tree.get_terminals()
-    terminal_names = [t.name for t in terminal_tips]
-    terminal_indices = [tips.index(t) for t in terminal_tips]
-
     # Check diagonal elements (distance to self)
-    for i, clade in enumerate(tips):
+    for i in range(len(tips)):
         assert matrix[i, i] == 0  # Distance to self is 0
 
-    # Find indices of specific terminals
-    a_idx = terminal_indices[terminal_names.index('A')]
-    b_idx = terminal_indices[terminal_names.index('B')]
-    c_idx = terminal_indices[terminal_names.index('C')]
-    d_idx = terminal_indices[terminal_names.index('D')]
+    # Find indices of specific terminals - directly use the taxon names
+    a_idx = tips.index('A')
+    b_idx = tips.index('B')
+    c_idx = tips.index('C')
+    d_idx = tips.index('D')
 
     # Check specific pairwise distances based on the tree structure:
     # (((A:0.1,B:0.2)Node1:0.3,C:0.4)Node2:0.5,D:0.6);
@@ -172,10 +189,10 @@ def test_load_read_counts(example_read_counts_file):
 def test_group_sequences_by_sample():
     """Test grouping sequences by sample ID using regex."""
     mock_tips = [
-        type('Tip', (), {'name': 'sampleA_1_contig'}),
-        type('Tip', (), {'name': 'sampleA_2_contig'}),
-        type('Tip', (), {'name': 'sampleB_1_contig'}),
-        type('Tip', (), {'name': 'sampleC_xyz'}),
+        'sampleA_1_contig',
+        'sampleA_2_contig',
+        'sampleB_1_contig',
+        'sampleC_xyz',
     ]
 
     # Test with sample regex
@@ -239,13 +256,13 @@ def test_find_duplicates():
     }
 
     tips = [
-        type('Tip', (), {'name': 'sampleA_1'}),
-        type('Tip', (), {'name': 'sampleA_2'}),
-        type('Tip', (), {'name': 'sampleB_1'}),
-        type('Tip', (), {'name': 'sampleB_2'}),
+        'sampleA_1',
+        'sampleA_2',
+        'sampleB_1',
+        'sampleB_2',
     ]
 
-    tips_lookup = {t.name: i for i, t in enumerate(tips)}
+    tips_lookup = {t: i for i, t in enumerate(tips)}
 
     # Distance matrix: close for sampleA (0.01), distant for sampleB (0.5)
     dist_matrix = np.array([
@@ -264,63 +281,125 @@ def test_find_duplicates():
 
     threshold = 0.02  # Threshold to determine duplicates
 
-    good_seqs, bad_seqs, comorbidities = find_duplicates(
+    classifications = find_duplicates(
         sample_to_seqs, tips, dist_matrix, contig_to_reads, threshold
     )
 
-    # Should keep sampleA_2 (higher reads) and both sampleB (different)
-    assert "sampleA_2" in good_seqs
-    assert "sampleA_1" in bad_seqs
-    assert "sampleB_1" in good_seqs
-    assert "sampleB_2" in good_seqs
-    assert "sampleB_1" in comorbidities
-    assert "sampleB_2" in comorbidities
+    # Check classifications
+    assert classifications['sampleA_1'] == 'bad'
+    assert classifications['sampleA_2'] == 'good'  # Highest read count
+    assert classifications['sampleB_1'] == 'comorbidity'  # Distant sequences
+    assert classifications['sampleB_2'] == 'comorbidity'  # Distant sequences
 
 
-def test_write_results():
-    """Test writing results to output files."""
-    good_seqs = {"seqA", "seqC"}
-    bad_seqs = {"seqB"}
-    comorbidities = {"seqC"}
+def test_write_results(example_sequences):
+    """Test writing results to organized directories and files."""
+    classifications = {
+        'sampleA_1': 'good',
+        'sampleA_2': 'bad',
+        'sampleB_1': 'comorbidity',
+    }
+
+    sample_regex = r'sample[A-C]'
+    species = 'virus'
+    segment = 'L'
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        prefix = os.path.join(tmpdir, "test")
+        # Call write_results
+        write_results(classifications, example_sequences, species, segment, tmpdir, sample_regex)
 
-        write_results(good_seqs, bad_seqs, comorbidities, prefix)
-
-        # Check good sequences file
-        with open(f"{prefix}.good_seqs.txt") as f:
+        # Check classifications summary file
+        with open(f"{tmpdir}/classifications.tsv", "r") as f:
             lines = f.readlines()
-            assert len(lines) == 2
-            assert "seqA\n" in lines
-            assert "seqC\n" in lines
+            assert len(lines) == 4  # Header + 3 sequences
+            assert "tip name\tclassification\n" == lines[0]
+            assert "sampleA_1\tgood\n" in lines
+            assert "sampleA_2\tbad\n" in lines
+            assert "sampleB_1\tcomorbidity\n" in lines
 
-        # Check bad sequences file
-        with open(f"{prefix}.bad_seqs.txt") as f:
-            lines = f.readlines()
-            assert len(lines) == 1
-            assert "seqB\n" in lines
+        # Check directory structure and files
+        assert os.path.exists(f"{tmpdir}/sampleA/good/sampleA_1_virus_L.fasta")
+        assert os.path.exists(f"{tmpdir}/sampleA/bad/sampleA_2_virus_L.fasta")
+        assert os.path.exists(f"{tmpdir}/sampleB/good/sampleB_1_virus_L.fasta")  # comorbidity goes in good dir
 
-        # Check comorbidities file
-        with open(f"{prefix}.comorbidities.txt") as f:
-            lines = f.readlines()
-            assert len(lines) == 1
-            assert "seqC\n" in lines
+        # Verify content of a FASTA file
+        with open(f"{tmpdir}/sampleA/good/sampleA_1_virus_L.fasta", "r") as f:
+            content = f.read()
+            assert "sampleA_1" in content
+            assert "ACGT" in content
+
+
+def test_root_tree_at_midpoint(mocker):
+    """Test that a tree is correctly rooted at midpoint."""
+    # Create a test tree file
+    unrooted_tree_content = "(((A:0.1,B:0.2)Node1:0.3,C:0.4)Node2:0.5,D:0.6);"
+
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".nwk", delete=False) as f:
+        f.write(unrooted_tree_content)
+        tree_path = Path(f.name)
+
+    try:
+        # Set up mocks
+        mock_tree = mocker.Mock()
+        mock_phylo_read = mocker.patch("Bio.Phylo.read", return_value=mock_tree)
+        mock_phylo_write = mocker.patch("Bio.Phylo.write")
+
+        mock_phylodm_tree = mocker.Mock()
+        mock_phylodm_load = mocker.patch(
+            "phylodm.PhyloDM.load_from_newick_path",
+            return_value=mock_phylodm_tree
+        )
+
+        # Execute the function
+        result = root_tree_at_midpoint(tree_path)
+
+        # Verify the function calls
+        mock_phylo_read.assert_called_once_with(str(tree_path), "newick")
+        mock_tree.root_at_midpoint.assert_called_once()
+        mock_phylo_write.assert_called_once()
+        mock_phylodm_load.assert_called_once()
+
+        # Check result
+        assert result == mock_phylodm_tree
+
+    finally:
+        # Clean up
+        if os.path.exists(tree_path):
+            os.unlink(tree_path)
 
 
 def test_determine_duplicates(mocker):
     """Test the main determine_duplicates function."""
-    # This is a complex function that calls many others, so we mock most dependencies
-    mock_tree = mocker.Mock()
-    mock_alignment = Path("alignment.fasta")
+    # Mock tree path
+    mock_tree_path = Path("tree.nwk")
+    mock_sequences = Path("sequences.fasta")
     mock_table = Path("contigs.tsv")
+    species = 'virus'
+    segment = 'L'
 
     # Mock the various functions that determine_duplicates calls
     mocker.patch("pathlib.Path.exists", return_value=True)
     mock_makedirs = mocker.patch("os.makedirs")
-    mock_phylo_read = mocker.patch("Bio.Phylo.read", return_value=mock_tree)
 
-    # Patch the module functions directly (more refactor-friendly)
+    # Mock the root_tree_at_midpoint function instead of Phylo.read
+    mock_tree_obj = mocker.Mock()
+    mock_root_tree = mocker.patch.object(
+        dedup_module, "root_tree_at_midpoint",
+        return_value=mock_tree_obj
+    )
+
+    # Create mock sequence records
+    mock_seq_records = {
+        'seq1': mocker.Mock(),
+        'seq2': mocker.Mock()
+    }
+
+    # Fix the sequence parsing mocks to properly handle the iterator pattern
+    mock_seq_iter = list(mock_seq_records.keys())  # Use a list instead of iterator
+    mock_seqio = mocker.patch("Bio.SeqIO.parse", return_value=mock_seq_iter)
+    mocker.patch("Bio.SeqIO.to_dict", return_value=mock_seq_records)
+
+    # Patch the module functions directly
     mock_to_distance_matrix = mocker.patch.object(
         dedup_module, "to_distance_matrix",
         return_value=(["tip1", "tip2"], np.array([[0, 0.1], [0.1, 0]]))
@@ -338,7 +417,7 @@ def test_determine_duplicates(mocker):
     )
     mock_find_duplicates = mocker.patch.object(
         dedup_module, "find_duplicates",
-        return_value=({"tip1"}, {"tip2"}, set())
+        return_value={"tip1": "good", "tip2": "bad"}
     )
     mock_write_results = mocker.patch.object(
         dedup_module, "write_results"
@@ -346,20 +425,33 @@ def test_determine_duplicates(mocker):
 
     # Call the function
     determine_duplicates(
-        tree=Path("tree.nwk"),
-        alignment=mock_alignment,
+        tree=mock_tree_path,
+        sequences=mock_sequences,
         prefix="output",
         table=mock_table,
         sample_regex=r"sample\d+",
         reads_column="reads",
-        threshold=0.02
+        species=species,
+        segment=segment,
+        threshold=0.02,
+        log_level="DEBUG"
     )
 
     # Verify that the appropriate functions were called
-    mock_makedirs.assert_called_once()
-    mock_phylo_read.assert_called_once()
+    mock_makedirs.assert_called()
+    mock_root_tree.assert_called_once_with(mock_tree_path)
+    mock_to_distance_matrix.assert_called_once_with(mock_tree_obj)
     mock_write_distance_matrix.assert_called_once()
     mock_load_read_counts.assert_called_once()
     mock_group_sequences.assert_called_once()
     mock_find_duplicates.assert_called_once()
-    mock_write_results.assert_called_once()
+
+    # Check that write_results was called with the correct parameters
+    mock_write_results.assert_called_once_with(
+        {"tip1": "good", "tip2": "bad"},  # classifications
+        mock_seq_records,  # sequences
+        species,  # species
+        segment,  # segment
+        "output",  # prefix
+        r"sample\d+"  # sample_regex
+    )

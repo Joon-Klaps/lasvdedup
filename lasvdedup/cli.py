@@ -8,29 +8,82 @@ from pathlib import Path
 import yaml
 
 from .pipeline import run_pipeline
+from .utils.determine_duplicates import determine_duplicates
 
 
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description='LASV deduplication pipeline')
 
-    # Required arguments
-    parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True,
+    # Check if we should use backward compatibility mode
+    if len(sys.argv) > 1 and not sys.argv[1] in ['run', 'deduplicate']:
+        # No subcommand provided, use 'run' for backward compatibility
+        cmd_args = ['run'] + sys.argv[1:]
+    else:
+        cmd_args = sys.argv[1:]
+
+    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+
+    # Main pipeline command
+    run_parser = subparsers.add_parser('run', help='Run the full pipeline')
+
+    # Required arguments for the run command
+    run_parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True,
                       help='Path to contigs table (CSV/TSV format)')
 
-    # Optional arguments
-    parser.add_argument('--seq-dir', '--seq-data-dir', dest='seq_data_dir',
+    # Optional arguments for the run command
+    run_parser.add_argument('--seq-dir', '--seq-data-dir', dest='seq_data_dir',
                       help='Directory containing sequence data')
-    parser.add_argument('--ref-dir', '--base-data-dir', dest='base_data_dir',
+    run_parser.add_argument('--ref-dir', '--base-data-dir', dest='base_data_dir',
                       help='Base URL or path for reference data')
-    parser.add_argument('--outdir', '-o', help='Output directory')
-    parser.add_argument('--workdir', '-w', help='Working directory')
-    parser.add_argument('--config', '-c', help='Path to config file')
-    parser.add_argument('--threads', '-t', type=int, help='Number of threads to use')
-    parser.add_argument('--force', '-f', action='store_true', help='Force rerun all jobs')
-    parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
+    run_parser.add_argument('--outdir', '-o', help='Output directory')
+    run_parser.add_argument('--workdir', '-w', help='Working directory')
+    run_parser.add_argument('--config', '-c', help='Path to config file')
+    run_parser.add_argument('--threads', '-t', type=int, help='Number of threads to use')
+    run_parser.add_argument('--force', '-f', action='store_true', help='Force rerun all jobs')
+    run_parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
 
-    return parser.parse_args()
+    # Deduplicate command
+    dedup_parser = subparsers.add_parser('deduplicate', help='Run just the deduplication step')
+
+    # Required arguments for the deduplicate command
+    dedup_parser.add_argument('--tree', '-t', required=True, type=Path,
+                       help='Path to the phylogenetic tree file')
+    dedup_parser.add_argument('--sequences', '-s', required=True, type=Path,
+                       help='Path to sequences FASTA file')
+    dedup_parser.add_argument('--table', '-i', required=True, type=Path,
+                       help='Path to the contigs table')
+    dedup_parser.add_argument('--prefix', '-o', required=True, type=str,
+                       help='Output directory prefix')
+
+    # Optional arguments for the deduplicate command
+    dedup_parser.add_argument('--sample-regex', '-r', type=str, default=r'sample\d+',
+                       help='Regular expression to extract sample identifiers')
+    dedup_parser.add_argument('--reads-column', '-c', type=str, default='reads',
+                       help='Name of the column containing read counts')
+    dedup_parser.add_argument('--species', type=str, default='LASV',
+                       help='Species name for output files')
+    dedup_parser.add_argument('--segment', type=str, default='L',
+                       help='Segment name for output files')
+    dedup_parser.add_argument('--threshold', type=float, default=0.02,
+                       help='Distance threshold to identify duplicates')
+    dedup_parser.add_argument(
+        "-l",
+        "--log-level",
+        help="The desired log level (default WARNING).",
+        choices=("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"),
+        default="WARNING",
+    )
+
+    # Parse the modified args
+    args = parser.parse_args(cmd_args)
+
+    # If no command was provided and we didn't insert 'run', show help
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
+
+    return args
 
 
 def build_config(args):
@@ -101,16 +154,34 @@ def main():
     args = parse_args()
 
     try:
-        # Build complete configuration
-        config = build_config(args)
+        if args.command == 'run':
+            # Build complete configuration
+            config = build_config(args)
 
-        # Run pipeline with complete config
-        success = run_pipeline(
-            config=config,
-            dry_run=args.dry_run
-        )
+            # Run pipeline with complete config
+            success = run_pipeline(
+                config=config,
+                dry_run=args.dry_run
+            )
+            sys.exit(0 if success else 1)
 
-        sys.exit(0 if success else 1)
+        elif args.command == 'deduplicate':
+            # Run determine_duplicates directly with the provided arguments
+            determine_duplicates(
+                tree=args.tree,
+                sequences=args.sequences,
+                prefix=args.prefix,
+                table=args.table,
+                sample_regex=args.sample_regex,
+                reads_column=args.reads_column,
+                species=args.species,
+                segment=args.segment,
+                threshold=args.threshold,
+                log_level=args.log_level
+            )
+            print(f"Deduplication completed successfully. Results saved to: {args.prefix}")
+            sys.exit(0)
+
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

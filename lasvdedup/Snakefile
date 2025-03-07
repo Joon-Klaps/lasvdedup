@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
-from lasvdedup.utils import determine_duplicates
+from lasvdedup.utils.determine_duplicates import determine_duplicates
+
+# Define these as global variables if needed, but don't mix with wildcards
+SEGMENTS = config["SEGMENTS"]
+OUTDIR = config["OUTDIR"]
 
 rule all:
     input:
-        trees=expand("{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile", segment=config["SEGMENTS"], OUTDIR=config["OUTDIR"]),
-        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt", segment=config["SEGMENTS"], OUTDIR=config["OUTDIR"])
+        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt", segment=SEGMENTS, OUTDIR=OUTDIR)
 
 rule prepare_base_files:
     output:
@@ -58,7 +61,7 @@ rule extract_sequences:
 
 rule align_sequences:
     output:
-        aln="{OUTDIR}/lasv-{segment}.add.denovo.aln"
+        aln="{OUTDIR}/aln/lasv-{segment}.add.denovo.aln"
     input:
         sequences=rules.extract_sequences.output[0],
         base_aln=rules.prepare_base_files.output.alignments
@@ -71,7 +74,7 @@ rule align_sequences:
 
 rule trim_alignment:
     output:
-        aln="{OUTDIR}/lasv-{segment}.denovo.trimal.aln"
+        aln="{OUTDIR}/aln/lasv-{segment}.denovo.trimal.aln"
     input:
         rules.align_sequences.output.aln
     shell:
@@ -87,13 +90,13 @@ rule build_tree:
         alignment=rules.trim_alignment.output.aln,
         base_tree=rules.prepare_base_files.output.trees
     params:
-        model=config["IQTREE"]["MODEL"],
-        bootstrap=config["IQTREE"]["BOOTSTRAPS"],
-        prefix="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal"
+        prefix=lambda wildcards: f"{wildcards.OUTDIR}/iqtree-out/lasv-{wildcards.segment}.denovo.trimal".replace(" ",""),
+        model= lambda _: config["IQTREE"]["MODEL"],
+        bootstrap= lambda _: config["IQTREE"]["BOOTSTRAPS"]
     threads: workflow.cores
     shell:
         """
-        mkdir -p {OUTDIR}/iqtree-out/
+        mkdir -p {wildcards.OUTDIR}/iqtree-out/
         iqtree -m {params.model} -B {params.bootstrap} -T {threads} -g {input.base_tree} -redo -s {input.alignment} \
         -pre {params.prefix}
         """
@@ -105,20 +108,24 @@ rule determine_duplicates:
         good_seqs="{OUTDIR}/dedup/lasv-{segment}.good_seqs.txt"
     input:
         tree=rules.build_tree.output.tree,
-        alignment=rules.trim_alignment.output.aln,
+        sequences=rules.align_sequences.output.aln,
         table=config["CONTIGS_TABLE"]
     params:
-        prefix="{OUTDIR}/dedup/lasv-{segment}",
-        sample_regex=config["DEDUPLICATE"]["SAMPLE_REGEX"],
-        threshold=config["DEDUPLICATE"]["THRESHOLD"],
-        reads_column=config["DEDUPLICATE"]["READS_COLUMN"]
+        prefix=lambda wildcards: f"{wildcards.OUTDIR}/dedup/lasv-{wildcards.segment}".replace(" ",""),
+        sample_regex=lambda _: config["DEDUPLICATE"]["SAMPLE_REGEX"],
+        threshold=lambda _: str(config["DEDUPLICATE"]["THRESHOLD"]),
+        species= lambda _: config["DEDUPLICATE"]["SPECIES"],
+        reads_column=lambda _: config["DEDUPLICATE"]["READS_COLUMN"],
+
     run:
         determine_duplicates(
             tree=input.tree,
-            alignment=input.alignment,
+            sequences=input.sequences,
             prefix=params.prefix,
             table=input.table,
             sample_regex=params.sample_regex,
-            threshold=params.threshold,
             reads_column=params.reads_column,
-            )
+            species=params.species,
+            segment=wildcards.segment,
+            threshold=float(params.threshold),
+        )
