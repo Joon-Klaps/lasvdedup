@@ -288,8 +288,8 @@ def test_find_duplicates():
     # Check classifications
     assert classifications['sampleA_1'] == 'bad'
     assert classifications['sampleA_2'] == 'good'  # Highest read count
-    assert classifications['sampleB_1'] == 'comorbidity'  # Distant sequences
-    assert classifications['sampleB_2'] == 'comorbidity'  # Distant sequences
+    assert classifications['sampleB_1'] == 'coinfection'  # Distant sequences
+    assert classifications['sampleB_2'] == 'coinfection'  # Distant sequences
 
 
 def test_write_results(example_sequences):
@@ -297,7 +297,7 @@ def test_write_results(example_sequences):
     classifications = {
         'sampleA_1': 'good',
         'sampleA_2': 'bad',
-        'sampleB_1': 'comorbidity',
+        'sampleB_1': 'coinfection',
     }
 
     sample_regex = r'sample[A-C]'
@@ -309,21 +309,24 @@ def test_write_results(example_sequences):
         write_results(classifications, example_sequences, species, segment, tmpdir, sample_regex)
 
         # Check classifications summary file
-        with open(f"{tmpdir}/classifications.tsv", "r") as f:
+        parent_dir = os.path.dirname(tmpdir)
+        (f"{parent_dir}/{species}-{segment}-classifications.txt", "w")
+        with open(f"{parent_dir}/{species}-{segment}-classifications.tsv", "r") as f:
             lines = f.readlines()
             assert len(lines) == 4  # Header + 3 sequences
             assert "tip name\tclassification\n" == lines[0]
             assert "sampleA_1\tgood\n" in lines
             assert "sampleA_2\tbad\n" in lines
-            assert "sampleB_1\tcomorbidity\n" in lines
+            assert "sampleB_1\tcoinfection\n" in lines
 
         # Check directory structure and files
-        assert os.path.exists(f"{tmpdir}/sampleA/good/sampleA_1_virus_L.fasta")
-        assert os.path.exists(f"{tmpdir}/sampleA/bad/sampleA_2_virus_L.fasta")
-        assert os.path.exists(f"{tmpdir}/sampleB/good/sampleB_1_virus_L.fasta")  # comorbidity goes in good dir
+        assert os.path.exists(f"{tmpdir}/sampleA/good/sampleA_1_{species}_{segment}.fasta")
+        assert os.path.exists(f"{tmpdir}/sampleA/bad/sampleA_2_{species}_{segment}.fasta")
+        assert os.path.exists(f"{tmpdir}/sampleB/good/sampleB_1_{species}_{segment}.fasta")  # coinfection goes in good dir
+        assert os.path.exists(f"{tmpdir}/sampleB/good/sampleB_1_{species}_{segment}.fasta")  # coinfection goes in good dir
 
         # Verify content of a FASTA file
-        with open(f"{tmpdir}/sampleA/good/sampleA_1_virus_L.fasta", "r") as f:
+        with open(f"{tmpdir}/sampleA/good/sampleA_1_{species}_{segment}.fasta", "r") as f:
             content = f.read()
             assert "sampleA_1" in content
             assert "ACGT" in content

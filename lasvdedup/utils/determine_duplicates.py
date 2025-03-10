@@ -163,7 +163,7 @@ def find_duplicates(
         threshold: Distance threshold to identify duplicates
 
     Returns:
-        Dictionary mapping each tip name to its classification (good, bad, or comorbidity)
+m        Dictionary mapping each tip name to its classification (good, bad, or coinfection)
     """
     logger.info(f"Finding duplicates with distance threshold: {threshold}")
     classifications = {}  # Track classifications for each tip
@@ -172,7 +172,7 @@ def find_duplicates(
     # Count statistics
     good_count = 0
     bad_count = 0
-    comorbidity_count = 0
+    coinfection_count = 0
 
     total_samples = len(sample_to_seqs)
     for i, (sample, seq_names) in enumerate(sample_to_seqs.items()):
@@ -200,12 +200,12 @@ def find_duplicates(
                 bad_count += 1
         # Consensus sequences are distinct
         else:
-            logger.debug(f"Sample {sample}: Sequences are distinct (potential comorbidity)")
+            logger.debug(f"Sample {sample}: Sequences are distinct (potential coinfection)")
             for seq in seq_names:
-                classifications[seq] = "comorbidity"
-                comorbidity_count += 1
+                classifications[seq] = "coinfection"
+                coinfection_count += 1
 
-    logger.info(f"Classification results: {good_count} good, {bad_count} bad, {comorbidity_count} comorbidity")
+    logger.info(f"Classification results: {good_count} good, {bad_count} bad, {coinfection_count} coinfection")
     return classifications
 
 def get_distances(names: List , tips_lookup:Dict, matrix:np.ndarray) -> Dict[str, Dict[str, float]]:
@@ -284,8 +284,8 @@ def write_results(
         sample_id = match.group(0)
 
         # Determine effective classification for directory structure
-        # (comorbidity sequences go in "good" directory)
-        file_classification = "good" if classification in ["good", "comorbidity"] else "bad"
+        # (coinfection sequences go in "good" directory)
+        file_classification = "good" if classification in ["good", "coinfection"] else "bad"
 
         # Create directory structure
         output_dir = os.path.join(prefix, sample_id, file_classification)
@@ -304,7 +304,8 @@ def write_results(
             logger.warning(f"Sequence {seq_name} not found in the provided FASTA file, skipping...")
 
     # Write classification summary file
-    with open(f"{prefix}/classifications.tsv", "w") as class_file:
+    parent_dir = os.path.dirname(prefix)
+    with open(f"{parent_dir}/{species}-{segment}-classifications.tsv", "w") as class_file:
         class_file.write("tip name\tclassification\n")
         for tip_name in sorted(classifications.keys()):
             class_file.write(f"{tip_name}\t{classifications[tip_name]}\n")
