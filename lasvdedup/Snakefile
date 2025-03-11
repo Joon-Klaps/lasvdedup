@@ -8,7 +8,7 @@ OUTDIR = config["OUTDIR"]
 
 rule all:
     input:
-        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt", segment=SEGMENTS, OUTDIR=OUTDIR)
+        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.classifications.tsv", segment=SEGMENTS, OUTDIR=OUTDIR)
 
 rule prepare_base_files:
     output:
@@ -103,29 +103,20 @@ rule build_tree:
 
 rule determine_duplicates:
     output:
-        mldist="{OUTDIR}/dedup/lasv-{segment}.denovo.trimal.mldist",
-        bad_seqs="{OUTDIR}/dedup/lasv-{segment}.bad_seqs.txt",
-        good_seqs="{OUTDIR}/dedup/lasv-{segment}.good_seqs.txt"
+        classifications="{OUTDIR}/dedup/lasv-{segment}.classifications.tsv",
     input:
         tree=rules.build_tree.output.tree,
         sequences=rules.align_sequences.output.aln,
         table=config["CONTIGS_TABLE"]
     params:
         prefix=lambda wildcards: f"{wildcards.OUTDIR}/dedup/lasv-{wildcards.segment}".replace(" ",""),
-        sample_regex=lambda _: config["DEDUPLICATE"]["SAMPLE_REGEX"],
-        threshold=lambda _: str(config["DEDUPLICATE"]["THRESHOLD"]),
-        species= lambda _: config["DEDUPLICATE"]["SPECIES"],
-        reads_column=lambda _: config["DEDUPLICATE"]["READS_COLUMN"],
-
+        segment=lambda wildcards: wildcards.segment,
     run:
         determine_duplicates(
+            config=config,  # Pass full config object
             tree=input.tree,
             sequences=input.sequences,
             prefix=params.prefix,
             table=input.table,
-            sample_regex=params.sample_regex,
-            reads_column=params.reads_column,
-            species=params.species,
-            segment=wildcards.segment,
-            threshold=float(params.threshold),
+            segment=params.segment,  # Pass the segment for threshold selection
         )

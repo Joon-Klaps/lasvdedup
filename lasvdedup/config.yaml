@@ -25,5 +25,21 @@ IQTREE:
 DEDUPLICATE:
   SAMPLE_REGEX: "LVE[0-9]{5}"
   READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
-  THRESHOLD: 3.0
   SPECIES: "LASV"
+  THRESHOLDS:
+    L:  # L segment
+      LOWER: 0.03  # For L segment (slower evolving)
+      UPPER: 0.05
+      CLADE_SIZE: 12  # Minimum clade size threshold for L segment
+      Z_THRESHOLD: 2.5  # MAD Z-score threshold for L segment
+    S:  # S segment
+      LOWER: 0.02  # For S segment (faster evolving)
+      UPPER: 0.04
+      CLADE_SIZE: 8   # Smaller clade size threshold for S segment (more variable)
+      Z_THRESHOLD: 2.0  # Lower Z-score threshold for S segment
+  # Default thresholds for segments not explicitly defined
+  DEFAULT_THRESHOLD:
+    LOWER: 0.02
+    UPPER: 0.05
+    CLADE_SIZE: 10
+    Z_THRESHOLD: 2.0

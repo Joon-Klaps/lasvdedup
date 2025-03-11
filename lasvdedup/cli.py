@@ -59,14 +59,18 @@ def parse_args():
     # Optional arguments for the deduplicate command
     dedup_parser.add_argument('--sample-regex', '-r', type=str, default=r'sample\d+',
                        help='Regular expression to extract sample identifiers')
-    dedup_parser.add_argument('--reads-column', '-c', type=str, default='reads',
+    dedup_parser.add_argument('--reads-column', type=str, default='reads',
                        help='Name of the column containing read counts')
     dedup_parser.add_argument('--species', type=str, default='LASV',
                        help='Species name for output files')
     dedup_parser.add_argument('--segment', type=str, default='L',
                        help='Segment name for output files')
-    dedup_parser.add_argument('--threshold', type=float, default=0.02,
-                       help='Distance threshold to identify duplicates')
+    dedup_parser.add_argument('--lowerthreshold', type=float,
+                       help='Override distance threshold to identify duplicates')
+    dedup_parser.add_argument('--upperthreshold', type=float,
+                       help='Override distance threshold for intrahost variation')
+    dedup_parser.add_argument('--config', '-c', type=str,
+                       help='Path to configuration file with segment-specific thresholds')
     dedup_parser.add_argument(
         "-l",
         "--log-level",
@@ -166,8 +170,27 @@ def main():
             sys.exit(0 if success else 1)
 
         elif args.command == 'deduplicate':
-            # Run determine_duplicates directly with the provided arguments
+            # Create config dict if no config file provided but thresholds specified
+            config_dict = None
+            if args.config:
+                with open(args.config, 'r') as f:
+                    config_dict = yaml.safe_load(f)
+            elif args.lowerthreshold is not None or args.upperthreshold is not None:
+                # Create minimal config if thresholds were specified directly
+                config_dict = {
+                    'DEDUPLICATE': {
+                        'THRESHOLDS': {
+                            args.segment: {
+                                'LOWER': args.lowerthreshold,
+                                'UPPER': args.upperthreshold
+                            }
+                        }
+                    }
+                }
+
+            # Run determine_duplicates with config
             determine_duplicates(
+                config=config_dict,
                 tree=args.tree,
                 sequences=args.sequences,
                 prefix=args.prefix,
@@ -176,7 +199,6 @@ def main():
                 reads_column=args.reads_column,
                 species=args.species,
                 segment=args.segment,
-                threshold=args.threshold,
                 log_level=args.log_level
             )
             print(f"Deduplication completed successfully. Results saved to: {args.prefix}")
