@@ -9,7 +9,7 @@ SPECIES = config["SPECIES"]
 
 rule all:
     input:
-        duplicates=expand("{OUTDIR}/dedup/{species}-{segment}.classifications.tsv",
+        duplicates=expand("{OUTDIR}/dedup/{species}-{segment}-classifications.tsv",
                          species=SPECIES, segment=SEGMENTS, OUTDIR=OUTDIR)
 
 rule prepare_base_files:
@@ -108,7 +108,7 @@ rule build_tree:
 
 rule determine_duplicates:
     output:
-        classifications="{OUTDIR}/dedup/{species}-{segment}.classifications.tsv",
+        classifications="{OUTDIR}/dedup/{species}-{segment}-classifications.tsv",
     input:
         tree=rules.build_tree.output.tree,
         sequences=rules.align_sequences.output.aln,
