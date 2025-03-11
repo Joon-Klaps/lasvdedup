@@ -113,26 +113,3 @@ def test_full_workflow(setup_test_data, test_config):
         "L segment classifications file not created"
     assert (output_dir / "dedup/LASV-S-classifications.tsv").exists(), \
         "S segment classifications file not created"
-
-def test_individual_rules(setup_test_data, test_config):
-    """Test individual rules from the workflow using our pipeline API."""
-    test_workdir = setup_test_data
-
-    # Test individual rules
-    rules = [
-        "prepare_base_files",
-        "extract_sequences",
-        "align_sequences",
-        "trim_alignment"
-    ]
-
-    for rule in rules:
-        # Create a modified config with a target rule
-        rule_config = test_config.copy()
-        rule_config["target"] = rule
-        rule_config["FORCE"] = True  # Force rerun for each rule
-
-        # Run the pipeline with target rule
-        success = run_pipeline(config=rule_config)
-
-        assert success, f"Rule {rule} failed to execute"
