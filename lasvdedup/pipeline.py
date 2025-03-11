@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 import snakemake
-from resources import get_snakefile_path
+from .utils.resources import get_snakefile_path
 
 def run_pipeline(config, dry_run=False):
     """
