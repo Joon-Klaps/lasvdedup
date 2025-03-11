@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import snakemake
 
-
 def run_pipeline(config, dry_run=False):
     """
     Run the LASV deduplication pipeline using Snakemake.
@@ -42,5 +41,5 @@ def run_pipeline(config, dry_run=False):
         success = snakemake.snakemake(**snakemake_args)
         return success
     except Exception as e:
-        print(f"Error running snakemake: {e}")
+        logger.error(f"Error running snakemake: {e}")
         return False

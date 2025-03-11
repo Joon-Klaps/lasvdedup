@@ -6,7 +6,7 @@ OUTDIR: "test-output"
 WORKDIR: ".test-work"
 
 # Reduced parameters for testing
-THREADS: 1
+THREADS: 2
 
 # Analysis parameters - keep the same as main config
 SPECIES: "LASV"
@@ -14,11 +14,11 @@ SEGMENTS: ["L", "S"]
 
 # Testing-specific tool parameters
 MAFFT:
-  THREADS: 1
+  THREADS: 2
 
 IQTREE:
-  MODEL: "HKY"  # Simpler model for testing
-  BOOTSTRAPS: 10  # Minimal bootstraps for testing
+  MODEL: "HKY"
+  EXTRA_PARAMS: "--ninit 20 --ntop 5 --nbest 3 -n 10"
 
 # Keep deduplication settings the same
 DEDUPLICATE:

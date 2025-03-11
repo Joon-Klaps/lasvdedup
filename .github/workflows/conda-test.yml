@@ -9,6 +9,11 @@ on:
 jobs:
   test-conda:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
     steps:
     - uses: actions/checkout@v3
 
@@ -16,7 +21,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: "3.9"
+        python-version: ${{ matrix.python-version }}
         channels: conda-forge,bioconda,defaults
 
     - name: Install dependencies

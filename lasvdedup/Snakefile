@@ -96,13 +96,14 @@ rule build_tree:
         base_tree=rules.prepare_base_files.output.trees
     params:
         prefix=lambda wildcards: f"{wildcards.OUTDIR}/iqtree-out/{wildcards.species}-{wildcards.segment}.denovo.trimal".replace(" ",""),
-        model= lambda _: config["IQTREE"]["MODEL"],
-        bootstrap= lambda _: config["IQTREE"]["BOOTSTRAPS"]
+        model=lambda _: config["IQTREE"]["MODEL"],
+        bootstrap=lambda _: f"-B {config['IQTREE']['BOOTSTRAPS']}" if config["IQTREE"].get("BOOTSTRAPS") else "",
+        extra_args=lambda _: config["IQTREE"].get("EXTRA_PARAMS", ""),
     threads: workflow.cores
     shell:
         """
         mkdir -p {wildcards.OUTDIR}/iqtree-out/
-        iqtree -m {params.model} -B {params.bootstrap} -T {threads} -g {input.base_tree} -redo -s {input.alignment} \
+        iqtree -m {params.model} {params.bootstrap} {params.extra_args} -T {threads} -g {input.base_tree} -redo -s {input.alignment} \
         -pre {params.prefix}
         """
 
