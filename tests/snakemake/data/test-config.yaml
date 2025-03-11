@@ -1,0 +1,42 @@
+# Test configuration for Snakemake workflow
+CONTIGS_TABLE: "contigs-test.tsv"
+SEQ_DATA_DIR: "seq_data"
+BASE_DATA_DIR: "https://raw.githubusercontent.com/Joon-Klaps/lasvdedup/refs/heads/main/lasvdedup/data/"
+OUTDIR: "test-output"
+WORKDIR: ".test-work"
+
+# Reduced parameters for testing
+THREADS: 1
+
+# Analysis parameters - keep the same as main config
+SPECIES: "LASV"
+SEGMENTS: ["L", "S"]
+
+# Testing-specific tool parameters
+MAFFT:
+  THREADS: 1
+
+IQTREE:
+  MODEL: "HKY"  # Simpler model for testing
+  BOOTSTRAPS: 10  # Minimal bootstraps for testing
+
+# Keep deduplication settings the same
+DEDUPLICATE:
+  SAMPLE_REGEX: "LVE[0-9]{5}"
+  READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
+  THRESHOLDS:
+    L:
+      LOWER: 0.03
+      UPPER: 0.05
+      CLADE_SIZE: 2  # Lower for testing
+      Z_THRESHOLD: 2.5
+    S:
+      LOWER: 0.02
+      UPPER: 0.04
+      CLADE_SIZE: 2  # Lower for testing
+      Z_THRESHOLD: 2.0
+  DEFAULT_THRESHOLD:
+    LOWER: 0.02
+    UPPER: 0.05
+    CLADE_SIZE: 2
+    Z_THRESHOLD: 2.0

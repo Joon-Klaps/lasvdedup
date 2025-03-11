@@ -1,0 +1,5 @@
+index	(annotation) acronym	(annotation) segment	(samtools Post-dedup) reads mapped (R1+R2)
+LVE00001_L_contig1	LASV	L	1000
+LVE00002_L_contig1	LASV	L	1200
+LVE00001_S_contig1	LASV	S	800
+LVE00002_S_contig1	LASV	S	950
