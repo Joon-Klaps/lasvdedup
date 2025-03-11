@@ -53,7 +53,20 @@ def is_all_distances_below_threshold(distances, threshold):
 
 def select_best_sequence(seq_names, reads):
     """Select the sequence with the highest read count."""
-    return max(reads, key=reads.get)
+    if not seq_names:
+        raise ValueError("Empty sequence list provided")
+
+    # Check if all sequences have read counts
+    missing_seqs = [seq for seq in seq_names if seq not in reads]
+    if missing_seqs:
+        raise KeyError(f"Missing read counts for sequences: {', '.join(missing_seqs)}")
+
+    # Check if all read counts are numeric
+    non_numeric = [seq for seq in seq_names if not isinstance(reads[seq], (int, float))]
+    if non_numeric:
+        raise TypeError(f"Non-numeric read counts for sequences: {', '.join(non_numeric)}")
+
+    return max(seq_names, key=lambda seq: reads[seq])
 
 def get_reads (seq_name: str, contig_to_reads: Dict[str, Dict[str, int]]) -> int:
     """
@@ -63,14 +76,23 @@ def get_reads (seq_name: str, contig_to_reads: Dict[str, Dict[str, int]]) -> int
         seq_name: Sequence name
         contig_to_reads: Dictionary mapping contig IDs to read counts
     """
+    # Try exact match first
     if seq_name in contig_to_reads:
         return contig_to_reads[seq_name]["reads"]
-    elif seq_name.replace('_R_', '').split(".", 1)[0] in contig_to_reads:
-        return contig_to_reads[seq_name.replace('_R_', '').split(".", 1)[0]]["reads"]
+
+    # Try with _R_ replacement and splitting at first dot
+    base_name = seq_name.replace('_R_', '').split(".", 1)[0]
+    if base_name in contig_to_reads:
+        return contig_to_reads[base_name]["reads"]
+
+    # Try with just the part before any dots (for cases like seq.with.dots.extra)
+    for key in contig_to_reads.keys():
+        # Check if the key is a prefix of seq_name or matches before any dots
+        if seq_name.startswith(key) and (len(seq_name) == len(key) or seq_name[len(key)] == '.'):
+            return contig_to_reads[key]["reads"]
 
     logger.warning(f"Read count not found for sequence: {seq_name}")
     raise ValueError(f"Read count not found for sequence: {seq_name}")
-
 
 def cluster_sequences(seq_names, tips_lookup, dist_matrix, threshold):
     """
@@ -279,7 +301,7 @@ def classify_sample(
                 classifications[seq] = Classification(
                     sequence_name=seq,
                     classification_type=ClassificationType.BAD,
-                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {lowerthreshold}, lower read count ({reads[seq]}) than {[best_seq]}",
+                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {lowerthreshold}, lower read count ({reads[seq]}) than {best_seq})",
                     sample_id=sample_id,
                     group_members=cluster,
                     decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,  # Set decision category

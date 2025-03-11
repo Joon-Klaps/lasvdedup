@@ -1,10 +1,11 @@
 import os
 import re
+import numpy as np
 import pandas as pd
 import logging
 from pathlib import Path
 from Bio import SeqIO
-from typing import Dict
+from typing import Dict, List
 
 # Import the Classification classes
 from .classification import Classification
@@ -49,6 +50,22 @@ def load_read_counts(table_path: Path, reads_column:str) -> Dict[str, Dict[str, 
     except Exception as e:
         logger.error("Error loading read counts: %s", e, exc_info=True)
         raise
+
+def write_distance_matrix(dist_matrix: np.ndarray, labels: List, output_path: str) -> None:
+    """Write distance matrix to a file."""
+    logger.info("Writing distance matrix to %s", output_path)
+    n_labels = len(labels)
+
+    with open(output_path, "w") as mldist_file:
+        mldist_file.write(f"{n_labels}\n")
+        for i, term in enumerate(labels):
+            # Handle both string labels and objects with name attribute
+            label = term if isinstance(term, str) else term.name
+            line = [label]
+            for j in range(n_labels):
+                line.append(f"{dist_matrix[i, j]:.6f}")
+            mldist_file.write("\t".join(line) + "\n")
+    logger.info("Distance matrix written successfully")
 
 def write_results(
     classifications: Dict[str, Classification],
@@ -96,7 +113,7 @@ def write_results(
 
         # Create filename
         basename = os.path.basename(seq_name)
-        output_filename = f"{basename}_{species}_{segment}.fasta"
+        output_filename = f"{basename}-{species}-{segment}.fasta"
         output_path = os.path.join(output_dir, output_filename)
 
         # Write the sequence to a FASTA file

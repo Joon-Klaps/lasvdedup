@@ -18,23 +18,6 @@ def to_distance_matrix(tree: PhyloDM) -> Tuple[List, np.ndarray]:
     logger.info("Distance matrix calculation completed in %.2f seconds", elapsed)
     return (labels, dm)
 
-def write_distance_matrix(dist_matrix: np.ndarray, labels: List, output_path: str) -> None:
-    """Write distance matrix to a file."""
-    logger.info("Writing distance matrix to %s", output_path)
-    n_labels = len(labels)
-
-    with open(output_path, "w") as mldist_file:
-        mldist_file.write(f"{n_labels}\n")
-        for i, term in enumerate(labels):
-            # Handle both string labels and objects with name attribute
-            label = term if isinstance(term, str) else term.name
-            line = [label]
-            for j in range(n_labels):
-                line.append(f"{dist_matrix[i, j]:.6f}")
-            mldist_file.write("\t".join(line) + "\n")
-    logger.info("Distance matrix written successfully")
-
-
 def get_distances(names: List , tips_lookup:Dict, matrix:np.ndarray) -> Dict[str, Dict[str, float]]:
     """
     Get distances between all pairs of sequences in the tree.
@@ -64,7 +47,7 @@ def get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold
     outliers = []
 
     # Select a random reference sequence from those in seq_names
-    references = set(clade_members) & set(seq_names)
+    references = set(clade_members) - set(seq_names)
     reference = references.pop()
 
     # Collect distances from reference to other clade members
@@ -76,14 +59,14 @@ def get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold
 
     # Compare median absolute deviation with z-score threshold
     mad = np.median(np.abs(distances - median))
-    if mad == 0:
-        return []  # No variation in distances
+    logger.debug("MAD: %.4f for clade %s", mad, clade_members)
 
     outlier_threshold = z_threshold * mad
 
     # Identify outliers
     for seq in seq_names:
         dist = dist_matrix[tips_lookup[reference], tips_lookup[seq]]
+        logger.debug("Distance from %s to %s: %.4f with median: %.4f and threshold of %.4f", reference, seq, dist, median, outlier_threshold)
         if np.abs(dist - median) > outlier_threshold:
             outliers.append(seq)
 

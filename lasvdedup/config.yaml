@@ -9,9 +9,8 @@ WORKDIR: ".work"       # Working directory for Snakemake
 THREADS: 4        # Default threads for the whole pipeline
 
 # Analysis parameters
-SEGMENTS:
-  - "L"
-  - "S"
+SPECIES: "LASV"
+SEGMENTS: ["L", "S"]
 
 # Tool-specific parameters
 MAFFT:
@@ -25,7 +24,6 @@ IQTREE:
 DEDUPLICATE:
   SAMPLE_REGEX: "LVE[0-9]{5}"
   READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
-  SPECIES: "LASV"
   THRESHOLDS:
     L:  # L segment
       LOWER: 0.03  # For L segment (slower evolving)

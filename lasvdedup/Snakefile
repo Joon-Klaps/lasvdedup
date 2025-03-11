@@ -5,17 +5,20 @@ from lasvdedup.utils.determine_duplicates import determine_duplicates
 # Define these as global variables if needed, but don't mix with wildcards
 SEGMENTS = config["SEGMENTS"]
 OUTDIR = config["OUTDIR"]
+SPECIES = config["SPECIES"]
 
 rule all:
     input:
-        duplicates=expand("{OUTDIR}/dedup/lasv-{segment}.classifications.tsv", segment=SEGMENTS, OUTDIR=OUTDIR)
+        duplicates=expand("{OUTDIR}/dedup/{species}-{segment}.classifications.tsv",
+                         species=SPECIES, segment=SEGMENTS, OUTDIR=OUTDIR)
 
 rule prepare_base_files:
     output:
-        alignments="{OUTDIR}/raw/lasv-base-{segment}.aln",
-        trees="{OUTDIR}/raw/lasv-base-{segment}.treefile"
+        alignments="{OUTDIR}/raw/{species}-base-{segment}.aln",
+        trees="{OUTDIR}/raw/{species}-base-{segment}.treefile"
     params:
-        base_dir=config["BASE_DATA_DIR"]
+        base_dir=config["BASE_DATA_DIR"],
+        species=SPECIES  # Pass species as a parameter
     shell:
         """
         mkdir -p {OUTDIR}/raw
@@ -24,22 +27,22 @@ rule prepare_base_files:
         if [[ "{params.base_dir}" == http* ]]; then
             # If BASE_DATA_DIR is a URL, download the file
             echo "Downloading alignment file for {wildcards.segment}..."
-            wget -O {output.alignments} "{params.base_dir}/LASV-{wildcards.segment}.aln" || \
-            curl -o {output.alignments} "{params.base_dir}/LASV-{wildcards.segment}.aln" || \
+            wget -O {output.alignments} "{params.base_dir}/{params.species}-{wildcards.segment}.aln" || \
+            curl -o {output.alignments} "{params.base_dir}/{params.species}-{wildcards.segment}.aln" || \
             (echo "Failed to download {wildcards.segment} alignment file" && exit 1)
             echo "Alignment download complete."
 
             echo "Downloading tree file for {wildcards.segment}..."
-            wget -O {output.trees} "{params.base_dir}/LASV-{wildcards.segment}.treefile" || \
-            curl -o {output.trees} "{params.base_dir}/LASV-{wildcards.segment}.treefile" || \
+            wget -O {output.trees} "{params.base_dir}/{params.species}-{wildcards.segment}.treefile" || \
+            curl -o {output.trees} "{params.base_dir}/{params.species}-{wildcards.segment}.treefile" || \
             (echo "Failed to download {wildcards.segment} tree file" && exit 1)
             echo "Tree download complete."
         else
             # If BASE_DATA_DIR is a local path, copy the file
-            cp "{params.base_dir}/LASV-{wildcards.segment}.aln" {output.alignments} || \
+            cp "{params.base_dir}/{params.species}-{wildcards.segment}.aln" {output.alignments} || \
             (echo "Failed to copy {wildcards.segment} alignment file" && exit 1)
 
-            cp "{params.base_dir}/LASV-{wildcards.segment}.treefile" {output.trees} || \
+            cp "{params.base_dir}/{params.species}-{wildcards.segment}.treefile" {output.trees} || \
             (echo "Failed to copy {wildcards.segment} tree file" && exit 1)
         fi
         echo "Processing for segment {wildcards.segment} completed successfully."
@@ -47,21 +50,23 @@ rule prepare_base_files:
 
 rule extract_sequences:
     output:
-        "{OUTDIR}/raw/lasv-{segment}.denovo.fasta"
+        "{OUTDIR}/raw/{species}-{segment}.denovo.fasta"
     input:
         contigs=config["CONTIGS_TABLE"],
         seq_data_dir=config["SEQ_DATA_DIR"],
+    params:
+        species=SPECIES  # Pass species as a parameter
     shell:
         """
         mkdir -p {OUTDIR}/raw
-        csvtk -t filter2 -f '${{(annotation) acronym}}=="LASV" && ${{(annotation) segment}}=="{wildcards.segment}"' {input.contigs} | \
+        csvtk -t filter2 -f '${{(annotation) acronym}}=="{params.species}" && ${{(annotation) segment}}=="{wildcards.segment}"' {input.contigs} | \
         cut -f1 | grep -v "_consensus" | \
         xargs -I @ find {input.seq_data_dir} -name "*@*" -type f -exec cat {{}} + > {output}
         """
 
 rule align_sequences:
     output:
-        aln="{OUTDIR}/aln/lasv-{segment}.add.denovo.aln"
+        aln="{OUTDIR}/aln/{species}-{segment}.add.denovo.aln"
     input:
         sequences=rules.extract_sequences.output[0],
         base_aln=rules.prepare_base_files.output.alignments
@@ -74,7 +79,7 @@ rule align_sequences:
 
 rule trim_alignment:
     output:
-        aln="{OUTDIR}/aln/lasv-{segment}.denovo.trimal.aln"
+        aln="{OUTDIR}/aln/{species}-{segment}.denovo.trimal.aln"
     input:
         rules.align_sequences.output.aln
     shell:
@@ -84,13 +89,13 @@ rule trim_alignment:
 
 rule build_tree:
     output:
-        tree="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.treefile",
-        log="{OUTDIR}/iqtree-out/lasv-{segment}.denovo.trimal.log"
+        tree="{OUTDIR}/iqtree-out/{species}-{segment}.denovo.trimal.treefile",
+        log="{OUTDIR}/iqtree-out/{species}-{segment}.denovo.trimal.log"
     input:
         alignment=rules.trim_alignment.output.aln,
         base_tree=rules.prepare_base_files.output.trees
     params:
-        prefix=lambda wildcards: f"{wildcards.OUTDIR}/iqtree-out/lasv-{wildcards.segment}.denovo.trimal".replace(" ",""),
+        prefix=lambda wildcards: f"{wildcards.OUTDIR}/iqtree-out/{wildcards.species}-{wildcards.segment}.denovo.trimal".replace(" ",""),
         model= lambda _: config["IQTREE"]["MODEL"],
         bootstrap= lambda _: config["IQTREE"]["BOOTSTRAPS"]
     threads: workflow.cores
@@ -103,13 +108,13 @@ rule build_tree:
 
 rule determine_duplicates:
     output:
-        classifications="{OUTDIR}/dedup/lasv-{segment}.classifications.tsv",
+        classifications="{OUTDIR}/dedup/{species}-{segment}.classifications.tsv",
     input:
         tree=rules.build_tree.output.tree,
         sequences=rules.align_sequences.output.aln,
         table=config["CONTIGS_TABLE"]
     params:
-        prefix=lambda wildcards: f"{wildcards.OUTDIR}/dedup/lasv-{wildcards.segment}".replace(" ",""),
+        prefix=lambda wildcards: f"{wildcards.OUTDIR}/dedup/{wildcards.species}-{wildcards.segment}".replace(" ",""),
         segment=lambda wildcards: wildcards.segment,
     run:
         determine_duplicates(
