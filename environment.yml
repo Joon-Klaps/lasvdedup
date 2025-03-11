@@ -4,7 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - python>=3.9
+  - python>=3.9, <3.13
   - snakemake-minimal=7.32
   - mafft
   - iqtree>=2.1
