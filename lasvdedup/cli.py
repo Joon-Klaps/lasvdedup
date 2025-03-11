@@ -6,10 +6,9 @@ import os
 import sys
 from pathlib import Path
 import yaml
-
-from .pipeline import run_pipeline
+from .utils.resources import get_config_path
 from .utils.determine_duplicates import determine_duplicates
-
+from .pipeline import run_pipeline
 
 def parse_args():
     """Parse command-line arguments."""
@@ -89,7 +88,6 @@ def parse_args():
 
     return args
 
-
 def build_config(args):
     """
     Build a complete configuration dictionary from CLI args and config file.
@@ -101,9 +99,7 @@ def build_config(args):
         dict: Complete configuration dictionary
     """
     # Determine config file path
-    package_dir = Path(__file__).parent
-    default_config = package_dir / "config.yaml"
-    config_path = args.config or default_config
+    config_path = args.config or get_config_path()
 
     # Ensure config file exists
     if not os.path.isfile(config_path):
@@ -135,8 +131,13 @@ def build_config(args):
         'WORKDIR': os.path.abspath(args.workdir) if args.workdir else ".",
     }
 
+    # Only override BASE_DATA_DIR if explicitly provided
     if args.base_data_dir:
         cli_overrides['BASE_DATA_DIR'] = args.base_data_dir
+    elif not config.get('BASE_DATA_DIR'):
+        # If no BASE_DATA_DIR in config either, don't set it
+        # It will fall back to the package data dir in the Snakefile
+        pass
 
     if args.threads:
         cli_overrides['THREADS'] = args.threads
@@ -151,7 +152,6 @@ def build_config(args):
     config.update(cli_overrides)
 
     return config
-
 
 def main():
     """Main entry point for the CLI."""

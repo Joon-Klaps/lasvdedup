@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import snakemake
+from resources import get_snakefile_path
 
 def run_pipeline(config, dry_run=False):
     """
@@ -16,8 +17,7 @@ def run_pipeline(config, dry_run=False):
         bool: True if the pipeline ran successfully, False otherwise
     """
     # Get Snakefile path from package
-    package_dir = Path(__file__).parent
-    snakefile = package_dir / "Snakefile"
+    snakefile = get_snakefile_path()
 
     # Extract some basic parameters from config
     workdir = config.get("WORKDIR", ".")

@@ -1,0 +1,5 @@
+include lasvdedup/config.yaml
+include lasvdedup/Snakefile
+include README.md
+include LICENSE
+recursive-include lasvdedup/data *
