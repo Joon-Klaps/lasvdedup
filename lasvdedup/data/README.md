@@ -7,6 +7,8 @@ This directory contains reference data files used by the LASV deduplication pipe
 
 These files are automatically used when no explicit `BASE_DATA_DIR` is specified.
 
+Alignments are based on all available sequences on nucleotide Genbank that matched the search term ‘Lassa’ on 19/10/2021. Sequences were excluded if they did not correspond to the species Lassa mammarenavirus (taxonomy ID: 3052310), contained the term "hypothetical protein - modified" in their descriptor, or were shorter than 5000 bp for the L-segment or 2000 bp for the S-segment.
+
 ## File Format
 
 Files should be named according to the pattern `{species}-{segment}.aln` and `{species}-{segment}.treefile`.
