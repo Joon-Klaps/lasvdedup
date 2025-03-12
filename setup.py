@@ -12,12 +12,10 @@ setup(
         "pandas",
         "pyyaml",
         "phylodm",
-        # Other dependencies
     ],
     entry_points={
         "console_scripts": [
             "lasvdedup=lasvdedup.cli:main",
         ],
     },
-    # Other metadata
 )
