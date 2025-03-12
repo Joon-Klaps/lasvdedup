@@ -41,5 +41,5 @@ def run_pipeline(config, dry_run=False):
         success = snakemake.snakemake(**snakemake_args)
         return success
     except Exception as e:
-        logger.error(f"Error running snakemake: {e}")
+        print(f"Error running snakemake: {e}")
         return False
