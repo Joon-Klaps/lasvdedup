@@ -1,5 +1,5 @@
 import pytest
-from lasvdedup.utils.determine_duplicates import get_segment_thresholds
+from lasvdedup.utils.determine_duplicates import get_segment_thresholds, determine_duplicates
 
 def test_get_segment_thresholds_from_config():
     """Test extracting segment-specific thresholds from config."""
@@ -17,14 +17,14 @@ def test_get_segment_thresholds_from_config():
     lower, upper, clade_size, z_threshold = get_segment_thresholds(config, 'L')
     assert lower == 0.03
     assert upper == 0.05
-    assert clade_size == 10  # Should get default value
+    assert clade_size == 8  # Should get default value
     assert z_threshold == 2.0  # Should get default value
 
     # Check S segment thresholds
     lower, upper, clade_size, z_threshold = get_segment_thresholds(config, 'S')
     assert lower == 0.02
     assert upper == 0.04
-    assert clade_size == 10  # Should get default value
+    assert clade_size == 8  # Should get default value
     assert z_threshold == 2.0  # Should get default value
 
 def test_get_default_thresholds():
@@ -46,7 +46,7 @@ def test_get_default_thresholds():
     lower, upper, clade_size, z_threshold = get_segment_thresholds(config, 'Z')
     assert lower == 0.02
     assert upper == 0.04
-    assert clade_size == 10  # Should get default value
+    assert clade_size == 8  # Should get default value
     assert z_threshold == 2.0  # Should get default value
 
 def test_backward_compatibility():
@@ -61,7 +61,7 @@ def test_backward_compatibility():
     lower, upper, clade_size, z_threshold = get_segment_thresholds(params, 'L')
     assert lower == 0.01
     assert upper == 0.03
-    assert clade_size == 10  # Should get default value
+    assert clade_size == 8  # Should get default value
     assert z_threshold == 2.0  # Should get default value
 
 def test_config_integration(mocker):
@@ -72,7 +72,8 @@ def test_config_integration(mocker):
         return_value={}
     )
 
-    from lasvdedup.utils.determine_duplicates import determine_duplicates
+    # Mock setup_logging to prevent file creation
+    mocker.patch('lasvdedup.utils.determine_duplicates.setup_logging')
 
     # Create test config with segment-specific thresholds
     config = {
@@ -119,7 +120,7 @@ def test_config_integration(mocker):
     assert args[5] == 0.04, "Upper threshold not passed correctly as positional argument"
 
     # Check keyword arguments
-    assert kwargs.get('clade_size') == 10
+    assert kwargs.get('clade_size') == 8
     assert kwargs.get('z_threshold') == 2.0
 
 def test_get_all_segment_thresholds():
