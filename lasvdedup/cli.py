@@ -171,26 +171,11 @@ def main():
 
         elif args.command == 'deduplicate':
             # Create config dict if no config file provided but thresholds specified
-            config_dict = None
-            if args.config:
-                with open(args.config, 'r') as f:
-                    config_dict = yaml.safe_load(f)
-            elif args.lowerthreshold is not None or args.upperthreshold is not None:
-                # Create minimal config if thresholds were specified directly
-                config_dict = {
-                    'DEDUPLICATE': {
-                        'THRESHOLDS': {
-                            args.segment: {
-                                'LOWER': args.lowerthreshold,
-                                'UPPER': args.upperthreshold
-                            }
-                        }
-                    }
-                }
+            config = build_config(args)
 
             # Run determine_duplicates with config
             determine_duplicates(
-                config=config_dict,
+                config=config,
                 tree=args.tree,
                 sequences=args.sequences,
                 prefix=args.prefix,

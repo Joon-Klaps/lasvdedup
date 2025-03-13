@@ -5,9 +5,9 @@
 A small snakemake pet project for deduplicating LASV (Lassa virus) sequences, from the output of the [viralgenie pipeline](https://github.com/Joon-Klaps/viralgenie)
 
 For the deduplication we set 3 (+1) empirical thresholds:
-- Lower threshold: 0.02
-- Upper threshold: 0.05
-- Clade size threshold: 10
+- Lower threshold: 0.01
+- Upper threshold: 0.02
+- Clade size threshold: 8
 - (Z-threshold for outliers: 2)
 
 ```mermaid
@@ -17,7 +17,7 @@ graph TD;
 
     C -->|No| D[Check for INTRAHOST evolutionary coinfection]
     D --> J[Cluster sequences based on Lower Threshold and select cluster representative based on most mapped reads]
-    C -->|Yes| E[Clade size of MRCA > 10?]
+    C -->|Yes| E[Clade size of MRCA > 8?]
 
     E -->|No| F[False Positive: Single long branch ~ Highly Unlikely]
     E -->|Yes| G[Pick a random base sequence. Any distances to it an outlier?]

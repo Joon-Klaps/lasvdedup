@@ -135,3 +135,15 @@ def write_results(
 
     logger.info("Wrote detailed classification summary to %s/%s-%s-classifications.tsv",
                 parent_dir, species, segment)
+
+
+    with open(f"{parent_dir}/{species}-{segment}.class.figtree.ann", "w") as class_file:
+        # Write header
+        class_file.write(Classification.annotation_line() + "\n")
+
+        # Write each classification
+        for seq_name in sorted(classifications.keys()):
+            class_file.write(classifications[seq_name].to_annotation_line() + "\n")
+
+    logger.info("Wrote detailed classification summary to %s/%s-%s.class.figtree.ann",
+                parent_dir, species, segment)

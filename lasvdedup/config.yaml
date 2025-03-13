@@ -26,19 +26,19 @@ DEDUPLICATE:
   READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
   THRESHOLDS:
     L:  # L segment
-      LOWER: 0.03
-      UPPER: 0.05
-      CLADE_SIZE: 12
-      Z_THRESHOLD: 2.5
+      LOWER: 0.01
+      UPPER: 0.02
+      CLADE_SIZE: 8
+      Z_THRESHOLD: 2
     S:  # S segment
-      LOWER: 0.02
-      UPPER: 0.04
+      LOWER: 0.01
+      UPPER: 0.02
       CLADE_SIZE: 8
       Z_THRESHOLD: 2.0
 
   # Default thresholds for segments not explicitly defined
   DEFAULT_THRESHOLD:
-    LOWER: 0.02
-    UPPER: 0.05
-    CLADE_SIZE: 10
-    Z_THRESHOLD: 2.0
+      LOWER: 0.01
+      UPPER: 0.02
+      CLADE_SIZE: 8
+      Z_THRESHOLD: 2.0

@@ -114,6 +114,26 @@ class Classification:
 
         return delimiter.join(fields)
 
+    def to_annotation_line(self, delimiter: str = "\t") -> str:
+        """Format the classification as a delimited line for output files.
+
+        Args:
+            delimiter: Field delimiter character (default: tab)
+
+        Returns:
+            Delimited string representation of the classification
+        """
+
+        # Create line with required fields
+        fields = [
+            self.sequence_name,
+            self.classification_type.value,
+            self.decision_category.value,
+            self.sample_id,
+        ]
+
+        return delimiter.join(fields)
+
     @staticmethod
     def header_line(delimiter: str = "\t") -> str:
         """Get the header line for classification output files.
@@ -126,6 +146,19 @@ class Classification:
         """
         fields = ["sequence_name", "classification", "decision_category",
                 "sample_id", "read_count", "group_members", "reason",]
+        return delimiter.join(fields)
+
+    @staticmethod
+    def annotation_line(delimiter: str = "\t") -> str:
+        """Get the header line for classification output files.
+
+        Args:
+            delimiter: Field delimiter character (default: tab)
+
+        Returns:
+            Header line string
+        """
+        fields = ["sequence_name", "classification", "decision_category", "sample_id"]
         return delimiter.join(fields)
 
     @property

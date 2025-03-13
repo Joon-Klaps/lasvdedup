@@ -54,24 +54,24 @@ def get_segment_thresholds(config, segment):
             return (
                 float(segment_thresholds.get('LOWER')),
                 float(segment_thresholds.get('UPPER')),
-                int(segment_thresholds.get('CLADE_SIZE', 10)),
+                int(segment_thresholds.get('CLADE_SIZE', 8)),
                 float(segment_thresholds.get('Z_THRESHOLD', 2.0))
             )
 
         # Use default thresholds if segment-specific ones aren't defined
         default = config.get('DEDUPLICATE', {}).get('DEFAULT_THRESHOLD', {})
         return (
-            float(default.get('LOWER', config.get('lowerthreshold', 0.02))),
-            float(default.get('UPPER', config.get('upperthreshold', 0.05))),
-            int(default.get('CLADE_SIZE', config.get('clade_size', 10))),
+            float(default.get('LOWER', config.get('lowerthreshold', 0.01))),
+            float(default.get('UPPER', config.get('upperthreshold', 0.02))),
+            int(default.get('CLADE_SIZE', config.get('clade_size', 8))),
             float(default.get('Z_THRESHOLD', config.get('z_threshold', 2.0)))
         )
 
     # If no config dictionary was provided, use the parameters directly
     return (
-        float(config.get('lowerthreshold', 0.02)),
-        float(config.get('upperthreshold', 0.05)),
-        int(config.get('clade_size', 10)),
+        float(config.get('lowerthreshold', 0.01)),
+        float(config.get('upperthreshold', 0.02)),
+        int(config.get('clade_size', 8)),
         float(config.get('z_threshold', 2.0))
     )
 
