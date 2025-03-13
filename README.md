@@ -1,6 +1,6 @@
 # LASV Deduplication Pipeline
 
-![Conda Test](https://github.com/Joon-Klaps/lasvdedup/actions/workflows/conda-test.yml/badge.svg)
+[![Conda Test](https://github.com/Joon-Klaps/lasvdedup/actions/workflows/conda-test.yml/badge.svg)](https://github.com/Joon-Klaps/lasvdedup/actions/workflows/conda-test.yml?query=workflow%3AConda)
 
 A small snakemake pet project for deduplicating LASV (Lassa virus) sequences, from the output of the [viralgenie pipeline](https://github.com/Joon-Klaps/viralgenie)
 
