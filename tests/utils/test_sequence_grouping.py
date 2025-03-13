@@ -680,7 +680,12 @@ class TestClassifySample:
                 # Also patch get_outliers
                 with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
                     # seq4 is an outlier
-                    mock_outliers.return_value = ['seq4']
+                    mock_outliers.return_value =  { "seq4" :
+                        {'distance': float(0.06),
+                        'median': float(0.04),
+                        'threshold': float(0.05),
+                        'reference': 'seq1',
+                    }}
 
                     result = classify_sample(
                         'sample1',
@@ -691,6 +696,8 @@ class TestClassifySample:
                         0.02, 0.05, data['tree'],
                         min_clade_size=5
                     )
+
+                    print(result)
 
         # Should identify seq4 as outlier and mark it as BAD
         assert result['seq4'].is_bad
