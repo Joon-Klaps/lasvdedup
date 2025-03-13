@@ -366,10 +366,13 @@ def classify_sample(
     outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold)
 
     if outliers:
-        logger.debug("Sample %s: Outliers found - likely false positive", sample_id)
-        outlier_names = ", ".join(outliers)
+        outlier_names = ", ".join(outliers.keys())
+        logger.debug("Sample %s: Outliers found %s - likely false positive", sample_id, outlier_names)
 
         good_seqs = [seq for seq in seq_names if seq not in outliers]
+        if not good_seqs:
+            logger.error("No good sequences found after removing outliers: %s", outlier_names)
+
         best_seq = select_best_sequence(good_seqs, reads)
 
         classifications[best_seq] = Classification(
@@ -378,19 +381,20 @@ def classify_sample(
             reason=f"Outliers detected ({outlier_names}), selected as best non-outlier sequence (highest read count: {reads[best_seq]})",
             sample_id=sample_id,
             group_members=group_members,
-            decision_category=DecisionCategory.OUTLIERS_DETECTED,  # Set decision category
+            decision_category=DecisionCategory.OUTLIERS_DETECTED,
             read_count=reads[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
             if seq in outliers:
+                outlier_info = outliers[seq]
                 classifications[seq] = Classification(
                     sequence_name=seq,
                     classification_type=ClassificationType.BAD,
-                    reason=f"Identified as phylogenetic outlier, {best_seq} selected instead (non-outlier with highest read count)",
+                    reason=f"Identified as phylogenetic outlier (distance - median: {outlier_info['distance'] - outlier_info['median']:.4f}, threshold: {outlier_info['threshold']:.4f}), {best_seq} selected instead (non-outlier with highest read count)",
                     sample_id=sample_id,
                     group_members=group_members,
-                    decision_category=DecisionCategory.OUTLIERS_DETECTED,  # Set decision category
+                    decision_category=DecisionCategory.OUTLIERS_DETECTED,
                     read_count=reads[seq]
                 )
             else:
@@ -400,7 +404,7 @@ def classify_sample(
                     reason=f"Non-outlier but with lower read count ({reads[seq]}) than {best_seq} ({reads[best_seq]})",
                     sample_id=sample_id,
                     group_members=group_members,
-                    decision_category=DecisionCategory.OUTLIERS_DETECTED,  # Set decision category
+                    decision_category=DecisionCategory.OUTLIERS_DETECTED,
                     read_count=reads[seq]
                 )
 

@@ -90,14 +90,23 @@ def test_get_outliers():
     outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=2.0)
 
     # Verify results
-    assert outliers == ['C']
+    assert isinstance(outliers, dict), "get_outliers should return a dictionary"
+    assert 'C' in outliers, "C should be identified as an outlier"
+    assert 'A' not in outliers, "A should not be identified as an outlier"
+    assert 'B' not in outliers, "B should not be identified as an outlier"
+
+    # Verify the outlier info contains the required fields
+    assert 'distance' in outliers['C'], "Outlier info should contain distance"
+    assert 'median' in outliers['C'], "Outlier info should contain median"
+    assert 'threshold' in outliers['C'], "Outlier info should contain threshold"
+    assert 'reference' in outliers['C'], "Outlier info should contain reference"
 
     # Test with a lower z_threshold that includes more outliers
     outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=1.0)
-    assert len(outliers) > 0
+    assert len(outliers) > 0, "With lower z-threshold, should find at least one outlier"
 
     # Test with all identical distances (no outliers)
     uniform_matrix = np.ones((5, 5)) * 0.1
     np.fill_diagonal(uniform_matrix, 0.0)
     outliers = get_outliers(clade_members, seq_names, tips_lookup, uniform_matrix)
-    assert outliers == []
+    assert outliers == {}, "With uniform distances, should find no outliers"

@@ -41,24 +41,50 @@ def get_distances(names: List , tips_lookup:Dict, matrix:np.ndarray) -> Dict[str
             distances.append(dist)
     return distances
 
-def get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=2.0):
+def get_outliers(clade_members: List[str], seq_names: List[str],
+        tips_lookup: Dict[str, int], dist_matrix: np.ndarray, z_threshold: float = 2.0) -> Dict[str, Dict[str, float]]:
     """Identify sequences that are outliers based on their distances."""
     logger.debug("Checking for outliers among %d sequences", len(seq_names))
-    outliers = []
-
-    # Select a random reference sequence from those in seq_names
+    outliers = {}
+    mad = 0
     references = set(clade_members) - set(seq_names)
-    reference = references.pop()
+    distances = []
 
-    # Collect distances from reference to other clade members
-    refid = tips_lookup[reference]
-    distances = [dist_matrix[refid, tips_lookup[member]] for member in clade_members if member != reference]
+    while mad == 0:
+        logger.debug(f"Currently the mad is {mad}, trying to find a reference sequence")
+        # Select a random reference sequence from those in seq_names
+        if len(references) == 0:
+            logger.debug("No reference sequences left to try")
+            break
 
-    # Calculate statistics
-    median = np.median(distances)
+        reference = references.pop()
+        logger.debug("Using %s as reference sequence", reference)
+        logger.debug("References: %s", references)
+        references = references - {reference}
 
-    # Compare median absolute deviation with z-score threshold
-    mad = np.median(np.abs(distances - median))
+        # Collect distances from reference to other clade members
+        refid = tips_lookup[reference]
+        distances = [
+            dist_matrix[refid, tips_lookup[member]]
+            for member in clade_members
+            if member != reference
+        ]
+
+        for member in seq_names:
+            if member == reference:
+                continue
+            logger.debug(f"Distance from {member} to ref {reference}: {dist_matrix[refid, tips_lookup[member]]}")
+
+        # Calculate statistics
+        median = np.median(distances)
+        logger.debug("Median distance from %s to clade members: %.4f", reference, median)
+        logger.debug("distances to median: %s", np.sort(np.abs(distances - median)))
+        mad = np.median(np.abs(distances - median))
+
+    if mad == 0:
+        logger.warning("Could not calculate MAD for clade %s, determining variance", clade_members)
+        mad = np.std(distances)
+
     logger.debug("MAD: %.4f for clade %s", mad, clade_members)
 
     outlier_threshold = z_threshold * mad
@@ -68,6 +94,11 @@ def get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold
         dist = dist_matrix[tips_lookup[reference], tips_lookup[seq]]
         logger.debug("Distance from %s to %s: %.4f with median: %.4f and threshold of %.4f", reference, seq, dist, median, outlier_threshold)
         if np.abs(dist - median) > outlier_threshold:
-            outliers.append(seq)
+            outliers[seq] = {
+                'distance': float(dist),
+                'median': float(median),
+                'threshold': float(outlier_threshold),
+                'reference': reference
+            }
 
     return outliers

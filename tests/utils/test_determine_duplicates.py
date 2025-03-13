@@ -388,7 +388,6 @@ def test_determine_duplicates_with_config_dict(
 
 def test_integration(mock_tree_file, mock_sequence_file, mock_table_file, tmp_path):
     """Integration test with minimal mocking."""
-    # Fix the pandas error by patching load_read_counts directly
     with patch('Bio.Phylo.read') as mock_phylo_read, \
          patch('Bio.Phylo.write') as mock_phylo_write, \
          patch('phylodm.PhyloDM.load_from_newick_path') as mock_phylodm_load, \

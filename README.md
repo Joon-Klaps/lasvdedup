@@ -20,7 +20,7 @@ graph TD;
     C -->|Yes| E[Clade size of MRCA > 10?]
 
     E -->|No| F[False Positive: Single long branch ~ Highly Unlikely]
-    E -->|Yes| G[Pick a random known sequence. Any distances to it an outlier?]
+    E -->|Yes| G[Pick a random base sequence. Any distances to it an outlier?]
 
     G -->|Yes| H[False Positive: Need for a single selection]
     G -->|No| I[TRUE Coinfection]

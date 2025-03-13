@@ -15,17 +15,21 @@ from .sequence_grouping import group_sequences_by_sample, find_duplicates
 # Set up logging
 logger = logging.getLogger("lasvdedup.duplicates")
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level=logging.INFO, filepath=None):
     """Configure logging for the duplicate detection module."""
     logger.setLevel(level)
 
     # Create console handler if none exists
     if not logger.handlers:
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler = logging.StreamHandler()
         console_handler.setLevel(level)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
+        fileHandler = logging.FileHandler(filepath)
+        fileHandler.setFormatter(formatter)
+        logger.addHandler(fileHandler)
 
 def get_segment_thresholds(config, segment):
     """
@@ -103,16 +107,24 @@ def determine_duplicates(config=None, **kwargs):
     else:
         config_data = {}
 
+    # Create output directory if it doesn't exist
+    prefix = kwargs["prefix"]
+    prefix_path = os.path.abspath(prefix)
+    os.makedirs(prefix, exist_ok=True)
+
+    # Extract segment for threshold determination
+    segment = kwargs.get("segment", None)
+    species = kwargs.get("species") or config_data.get('SPECIES', 'LASV')
+
     # Setup logging
     log_level = kwargs.get("log_level", "INFO")
-    setup_logging(log_level)
+    setup_logging(log_level, f"{prefix_path}/{species}-{segment}.log")
 
     # Log start of the process with parameters
     logger.info("Starting duplicate detection process")
 
     # Extract segment for threshold determination
     segment = kwargs.get("segment", None)
-
     # Get ALL thresholds based on segment
     lowerthreshold, upperthreshold, clade_size, z_threshold = get_segment_thresholds(
         config_data if config_data else kwargs,
@@ -123,10 +135,6 @@ def determine_duplicates(config=None, **kwargs):
                 segment, lowerthreshold, upperthreshold, clade_size, z_threshold)
 
     start_time = time.time()
-
-    # Create output directory if it doesn't exist
-    prefix = kwargs["prefix"]
-    os.makedirs(prefix, exist_ok=True)
 
     # Load and root the tree using the modular function
     tree = root_tree_at_midpoint(kwargs["tree"])
@@ -154,14 +162,9 @@ def determine_duplicates(config=None, **kwargs):
         clade_size=clade_size, z_threshold=z_threshold
     )
 
-    # Get species from config or kwargs
-    species = kwargs.get("species") or config_data.get('SPECIES', 'LASV')
-
     # Write results to output files
     logger.info("Loading sequences from %s", kwargs['sequences'])
     seq_records = SeqIO.to_dict(SeqIO.parse(str(kwargs["sequences"]), "fasta"))
-
-    prefix_path = os.path.abspath(prefix)
     write_results(classifications, seq_records, species, segment, prefix_path, sample_regex)
 
     # Log completion time
