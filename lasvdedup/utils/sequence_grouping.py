@@ -358,7 +358,7 @@ def classify_sample(
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
-            reason=f"Outliers detected ({outlier_names}), selected as best non-outlier sequence (highest read count: {reads[best_seq]})",
+            reason=f"Outliers detected ({outlier_names}), selected as best non-outlier sequence (highest read count: {stats[best_seq]})",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.OUTLIERS_DETECTED,

@@ -20,23 +20,31 @@ IQTREE:
   MODEL: "HKY"
   EXTRA_PARAMS: "--ninit 20 --ntop 5 --nbest 3 -n 10"
 
-# Keep deduplication settings the same
+# Sequence analysis settings
 DEDUPLICATE:
   SAMPLE_REGEX: "LVE[0-9]{5}"
-  READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
+  LENGTH_COLUMN: "(annotation) qlen"
+  SELECTION_COLUMNS:
+    - "(samtools Post-dedup) reads mapped (R1+R2)"
+    - "(general_stats) mosdepth 10X coverage"
   THRESHOLDS:
-    L:
-      LOWER: 0.03
-      UPPER: 0.05
-      CLADE_SIZE: 2  # Lower for testing
-      Z_THRESHOLD: 2.5
-    S:
-      LOWER: 0.02
-      UPPER: 0.04
-      CLADE_SIZE: 2  # Lower for testing
+    L:  # L segment
+      LOWER: 0.01
+      UPPER: 0.02
+      CLADE_SIZE: 8
+      Z_THRESHOLD: 2
+      TARGET_LENGTH: 7200
+    S:  # S segment
+      LOWER: 0.01
+      UPPER: 0.02
+      CLADE_SIZE: 8
       Z_THRESHOLD: 2.0
+      TARGET_LENGTH: 3400
+
+  # Default thresholds for segments not explicitly defined
   DEFAULT_THRESHOLD:
-    LOWER: 0.02
-    UPPER: 0.05
-    CLADE_SIZE: 2
-    Z_THRESHOLD: 2.0
+      LOWER: 0.01
+      UPPER: 0.02
+      CLADE_SIZE: 8
+      Z_THRESHOLD: 2.0
+      TARGET_LENGTH: 5000

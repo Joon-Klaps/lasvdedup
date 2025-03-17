@@ -32,16 +32,13 @@ def sort_table(table_path: Path, length_column:str,
     logger.info("Loaded table with %d rows and %d columns",
                 len(contigs_df), len(contigs_df.columns))
 
-    if length_column not in contigs_df.columns:
-        logger.error("Length column %s not found in table", length_column)
-        raise ValueError(f"Length column {length_column} not found in table: {table_path}")
-
-    if any( badcolumns :=  col for col in selection_columns if col not in contigs_df.columns):
+    # Check if all filtering columns are present in the table
+    if any( badcolumns :=  col for col in selection_columns + [length_column] if col not in contigs_df.columns):
         logger.error("Selection column %s not found in table: %s", badcolumns, table_path)
         raise ValueError(f"Selection column {badcolumns} not found in table: {table_path}")
 
     # Filter contigs by length
-    contigs_df["distance_to_expectation"] = abs(contigs_df[contigs_df[length_column] == expected_length])
+    contigs_df["distance_to_expectation"] = abs(contigs_df[length_column] - expected_length)
 
     # Filter contigs by selection columns
     rank_columns= ["distance_to_expectation"] + selection_columns

@@ -95,7 +95,7 @@ def test_write_results():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Mock file writing to avoid actual file operations
-        with patch('builtins.open', MagicMock()), \
+        with patch('builtins.open', MagicMock()) as mock_open, \
              patch('os.makedirs') as mock_makedirs, \
              patch('Bio.SeqIO.write') as mock_write:
 
@@ -116,13 +116,16 @@ def test_write_results():
             assert mock_write.call_count == 3
 
             # Verify the paths used for writing sequences
-            calls = mock_write.call_args_list
-            output_paths = [call[0][2] for call in calls]
+            # Extract paths from mock_open calls
+            output_paths = [call[0][0] for call in mock_open.call_args_list if len(call[0]) > 0]
+
+            # Filter only the paths for FASTA files (exclude the classification summary files)
+            fasta_paths = [path for path in output_paths if path.endswith('.fasta')]
 
             # Check that files were written to the correct directories
-            assert any('sample1/good' in path for path in output_paths)
-            assert any('sample1/bad' in path for path in output_paths)
-            assert any('sample2/good' in path for path in output_paths)  # coinfection goes to 'good'
+            assert any('sample1/good' in path for path in fasta_paths)
+            assert any('sample1/bad' in path for path in fasta_paths)
+            assert any('sample2/good' in path for path in fasta_paths)  # coinfection goes to 'good'
 
 def test_write_distance_matrix():
     """Test writing a distance matrix to file."""

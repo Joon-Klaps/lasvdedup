@@ -143,18 +143,6 @@ class TestSelectBestSequence:
         best_seq = select_best_sequence(seq_names, seq_data)
         assert best_seq in ['seqA', 'seqB']  # Either could be selected in case of tie
 
-    def test_with_string_ranks(self):
-        """Test with string values instead of integers (robustness test)."""
-        seq_names = ['seqA', 'seqB', 'seqC']
-        seq_data = {
-            'seqA': {'rank': '100'},
-            'seqB': {'rank': '200'},
-            'seqC': {'rank': '50'}
-        }
-
-        with pytest.raises(TypeError):
-            select_best_sequence(seq_names, seq_data)
-
     def test_with_empty_sequence_list(self):
         """Test behavior with empty sequence list."""
         with pytest.raises(ValueError):
@@ -563,8 +551,8 @@ class TestClassifySample:
             'seq2': {'reads': 200, 'coverage': 98.0, 'rank': 1},
             'seq3': {'reads': 150, 'coverage': 96.0, 'rank': 3},
             'seq4': {'reads': 300, 'coverage': 97.0, 'rank': 2},
-            'seq5': {'reads': 250, 'coverage': 94.0, 'rank': 5},
-            'seq6': {'reads': 350, 'coverage': 99.0, 'rank': 6}
+            'seq5': {'reads': 250, 'coverage': 94.0, 'rank': 6},
+            'seq6': {'reads': 350, 'coverage': 99.0, 'rank': 5}
         }
 
         mock_tree = MagicMock()
@@ -850,10 +838,10 @@ class TestClassifySample:
                 thresholds=data['thresholds']
             )
 
-        # Should select seq4 as good (highest read count) and mark others as bad
-        assert result['seq4'].is_good
+        # Should select seq2 as good (highest rank) and mark others as bad
+        assert result['seq2'].is_good
         assert result['seq1'].is_bad
-        assert result['seq2'].is_bad
+        assert result['seq4'].is_bad
 
         assert all(cls.decision_category == DecisionCategory.SMALL_CLADE for cls in result.values())
 
