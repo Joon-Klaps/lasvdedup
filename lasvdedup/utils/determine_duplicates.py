@@ -4,7 +4,9 @@ import os
 import logging
 import time
 from Bio import SeqIO
-import yaml
+from pathlib import Path
+from typing import Dict
+
 
 # Import sub utility functions
 from .tree_utils import root_tree_at_midpoint
@@ -31,7 +33,14 @@ def setup_logging(level=logging.INFO, filepath=None):
         fileHandler.setFormatter(formatter)
         logger.addHandler(fileHandler)
 
-def determine_duplicates(config=None):
+def determine_duplicates(
+            config: Dict,  # Pass full config object
+            tree: Path = None,
+            sequences: Path =None,
+            prefix: Path = None,
+            table: Path = None,
+            segment: str = None,
+        ):
     """
     Main function to detect duplicate sequences in a phylogenetic tree.
 
@@ -40,11 +49,11 @@ def determine_duplicates(config=None):
     """
 
     # Create output directory if it doesn't exist
-    prefix = config["prefix"]
+    prefix = Path(prefix) or config["prefix"]
     os.makedirs(prefix, exist_ok=True)
 
     # Extract segment for threshold determination
-    if (segment := config.get("segment")) is None:
+    if (segment := segment or config.get("segment")) is None:
         raise ValueError("Segment not provided in config or CLI arguments")
 
     if (species := config.get("species")) is None:
@@ -64,8 +73,9 @@ def determine_duplicates(config=None):
 
     start_time = time.time()
 
+    tree_path = Path(tree) or config["tree"]
     # Load and root the tree using the modular function
-    tree = root_tree_at_midpoint(config["tree"])
+    tree = root_tree_at_midpoint(tree_path)
 
     # Calculate distances from tree
     tips, dist_matrix = to_distance_matrix(tree["phylodm"])
@@ -74,12 +84,13 @@ def determine_duplicates(config=None):
     write_distance_matrix(dist_matrix, tips, f"{prefix}/distance_matrix.mldist")
 
     # Load read counts and coverage from contigs table
-    if (length_column  := config.get("length_colum")) is None:
+    if (length_column := config.get("length_column")) is None:
         logger.error("Length column not found in config or CLI arguments")
     selection_columns = config.get("selection_column") or []
 
     # Create dictionary of all contigs with their rank {sample: {rank: x, ...}}
-    contigs_ranked = sort_table(config["table"], length_column,
+    contig_table = Path(table) or config["table"]
+    contigs_ranked = sort_table(contig_table, length_column,
         selection_columns, expected_length = thresholds["target_length"])
 
     sample_regex = config.get("sample_regex", r'(LVE\d+)_.*')
@@ -94,8 +105,9 @@ def determine_duplicates(config=None):
         )
 
     # Write results to output files
-    logger.info("Loading sequences from %s", config['sequences'])
-    seq_records = SeqIO.to_dict(SeqIO.parse(str(config["sequences"]), "fasta"))
+    sequence_path = Path(sequences) or config["sequences"]
+    logger.info("Loading sequences from %s", sequence_path)
+    seq_records = SeqIO.to_dict(SeqIO.parse(str(sequence_path), "fasta"))
     write_results(classifications, seq_records, species, segment, prefix, sample_regex)
 
     # Log completion time

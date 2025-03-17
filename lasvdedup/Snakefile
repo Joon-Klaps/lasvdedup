@@ -124,5 +124,5 @@ rule determine_duplicates:
             sequences=input.sequences,
             prefix=params.prefix,
             table=input.table,
-            segment=params.segment,  # Pass the segment for threshold selection
+            segment=params.segment,
         )
