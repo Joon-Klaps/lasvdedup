@@ -19,7 +19,7 @@ setup(
         ],
     },
 
-    author="Your Name",
+    author="Joon Klaps",
     description="A pipeline for deduplicating LASV sequences",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',

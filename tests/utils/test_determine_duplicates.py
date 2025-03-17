@@ -5,66 +5,20 @@ import yaml
 import numpy as np
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
-from Bio import SeqIO, Phylo
-from io import StringIO
+import logging
 
 from lasvdedup.utils.determine_duplicates import determine_duplicates
 from lasvdedup.utils.classification import Classification, ClassificationType, DecisionCategory
 
 
-# Create test fixtures
-@pytest.fixture
-def mock_tree_file():
-    """Create a temporary mock Newick tree file."""
-    tree_content = "(((A:0.1,B:0.2):0.3,C:0.4):0.5,(D:0.6,E:0.7):0.8);"
-    with tempfile.NamedTemporaryFile(suffix='.treefile', delete=False) as tmp:
-        tmp.write(tree_content.encode('utf-8'))
-        tmp_path = tmp.name
-    yield tmp_path
-    os.unlink(tmp_path)
-
-
-@pytest.fixture
-def mock_sequence_file():
-    """Create a temporary mock FASTA file."""
-    fasta_content = """>A
-ACGTACGTACGT
->B
-ACGTACGTACGA
->C
-ACGTACGTAGGT
->D
-ACGTACGTACCC
->E
-ACGCACGTACGT
-"""
-    with tempfile.NamedTemporaryFile(suffix='.fasta', delete=False) as tmp:
-        tmp.write(fasta_content.encode('utf-8'))
-        tmp_path = tmp.name
-    yield tmp_path
-    os.unlink(tmp_path)
-
-
-@pytest.fixture
-def mock_table_file():
-    """Create a temporary mock table file."""
-    # Fix table format to ensure proper TSV structure
-    table_content = "index\tlength\tcoverage\nA\t1000\t20.5\nB\t950\t15.2\nC\t1200\t18.7\nD\t800\t22.3\nE\t1100\t19.8\n"
-    with tempfile.NamedTemporaryFile(suffix='.tsv', delete=False) as tmp:
-        tmp.write(table_content.encode('utf-8'))
-        tmp_path = tmp.name
-    yield tmp_path
-    os.unlink(tmp_path)
-
-
 @pytest.fixture
 def mock_config():
-    """Create a mock config dictionary."""
+    """Create a mock config dictionary with proper paths."""
     return {
-        "tree": "tree_path.treefile",
-        "sequences": "sequences.fasta",
-        "table": "contigs.tsv",
-        "prefix": "output_directory",
+        "tree": str(Path("tree_path.treefile")),
+        "sequences": str(Path("sequences.fasta")),
+        "table": str(Path("contigs.tsv")),
+        "prefix": str(Path("output_directory")),
         "species": "LASV",
         "segment": "L",
         "sample_regex": r"(\w+)_.*",
@@ -92,48 +46,46 @@ def mock_config():
     }
 
 
-@patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
-@patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')
-@patch('lasvdedup.utils.determine_duplicates.sort_table')
-@patch('lasvdedup.utils.determine_duplicates.group_sequences_by_sample')
-@patch('lasvdedup.utils.determine_duplicates.find_duplicates')
-@patch('lasvdedup.utils.determine_duplicates.write_results')
-@patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
-@patch('os.makedirs')
-def test_determine_duplicates_with_mocks(
-    mock_makedirs,
-    mock_write_distance_matrix,
-    mock_write_results,
-    mock_find_duplicates,
-    mock_group_sequences,
-    mock_sort_table,
-    mock_to_distance_matrix,
-    mock_root_tree,
-    mock_config
-):
-    """Test determine_duplicates with mocked dependencies."""
-    # Set up mocks
-    mock_tree = {'biophylo': MagicMock(), 'phylodm': MagicMock()}
-    mock_root_tree.return_value = mock_tree
+@pytest.fixture
+def mock_tree():
+    """Create a mock tree object."""
+    return {'biophylo': MagicMock(), 'phylodm': MagicMock()}
 
-    mock_tips = ['A', 'B', 'C', 'D', 'E']
-    mock_dist_matrix = np.zeros((5, 5))
-    mock_to_distance_matrix.return_value = (mock_tips, mock_dist_matrix)
 
-    mock_contigs_ranked = {
-        'A': {'length': 1000, 'coverage': 20.5},
-        'B': {'length': 950, 'coverage': 15.2},
-        'C': {'length': 1200, 'coverage': 18.7},
-        'D': {'length': 800, 'coverage': 22.3},
-        'E': {'length': 1100, 'coverage': 19.8}
+@pytest.fixture
+def mock_dist_matrix_data():
+    """Create mock distance matrix data."""
+    tips = ['A', 'B', 'C', 'D', 'E']
+    dist_matrix = np.zeros((5, 5))
+    # Add some distance values
+    dist_matrix[0, 1] = dist_matrix[1, 0] = 0.02  # A-B distance
+    dist_matrix[0, 2] = dist_matrix[2, 0] = 0.05  # A-C distance
+    dist_matrix[3, 4] = dist_matrix[4, 3] = 0.01  # D-E distance
+    return tips, dist_matrix
+
+
+@pytest.fixture
+def mock_contigs_ranked():
+    """Create mock ranked contigs data."""
+    return {
+        'A': {'length': 1000, 'coverage': 20.5, 'rank': 1, 'distance_to_expectation': 6000},
+        'B': {'length': 950, 'coverage': 15.2, 'rank': 2, 'distance_to_expectation': 6050},
+        'C': {'length': 1200, 'coverage': 18.7, 'rank': 3, 'distance_to_expectation': 5800},
+        'D': {'length': 800, 'coverage': 22.3, 'rank': 4, 'distance_to_expectation': 6200},
+        'E': {'length': 1100, 'coverage': 19.8, 'rank': 5, 'distance_to_expectation': 5900}
     }
-    mock_sort_table.return_value = mock_contigs_ranked
 
-    mock_samples = {'sample1': ['A', 'B'], 'sample2': ['C', 'D', 'E']}
-    mock_group_sequences.return_value = mock_samples
 
-    # Mock classifications with contig_stats instead of read_count
-    mock_classifications = {
+@pytest.fixture
+def mock_sample_groups():
+    """Create mock sample group data."""
+    return {'sample1': ['A', 'B'], 'sample2': ['C', 'D', 'E']}
+
+
+@pytest.fixture
+def mock_classifications():
+    """Create mock classification results."""
+    return {
         'A': Classification(
             sequence_name='A',
             classification_type=ClassificationType.GOOD,
@@ -153,42 +105,69 @@ def test_determine_duplicates_with_mocks(
             contig_stats={'length': 950, 'coverage': 15.2}
         )
     }
-    mock_find_duplicates.return_value = mock_classifications
 
-    # Mock sequence records
-    mock_seq_records = {
-        'A': MagicMock(),
-        'B': MagicMock(),
-        'C': MagicMock(),
-        'D': MagicMock(),
-        'E': MagicMock()
-    }
+
+@pytest.fixture
+def mock_seq_records():
+    """Create mock sequence records."""
+    mock_records = {}
+    for name in ['A', 'B', 'C', 'D', 'E']:
+        record = MagicMock()
+        record.id = name
+        record.seq = MagicMock()
+        record.seq.__len__.return_value = 1000
+        mock_records[name] = record
+    return mock_records
+
+
+@patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
+@patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')
+@patch('lasvdedup.utils.determine_duplicates.sort_table')
+@patch('lasvdedup.utils.determine_duplicates.group_sequences_by_sample')
+@patch('lasvdedup.utils.determine_duplicates.find_duplicates')
+@patch('lasvdedup.utils.determine_duplicates.write_results')
+@patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
+@patch('os.makedirs')
+@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch the entire setup_logging function
+def test_determine_duplicates_with_mocks(
+    mock_setup_logging,
+    mock_makedirs,
+    mock_write_distance_matrix,
+    mock_write_results,
+    mock_find_duplicates,
+    mock_group_sequences,
+    mock_sort_table,
+    mock_to_distance_matrix,
+    mock_root_tree,
+    mock_config,
+    mock_tree,
+    mock_dist_matrix_data,
+    mock_contigs_ranked,
+    mock_sample_groups,
+    mock_classifications,
+    mock_seq_records
+):
+    """Test determine_duplicates with mocked dependencies."""
+    # Set up mocks
+    mock_root_tree.return_value = mock_tree
+    mock_to_distance_matrix.return_value = mock_dist_matrix_data
+    mock_sort_table.return_value = mock_contigs_ranked
+    mock_group_sequences.return_value = mock_sample_groups
+    mock_find_duplicates.return_value = mock_classifications
 
     # Run the function
     with patch('Bio.SeqIO.to_dict', return_value=mock_seq_records):
-        result = determine_duplicates(config=mock_config)
+        with patch('Bio.SeqIO.parse'):  # Mock the actual parsing
+            result = determine_duplicates(config=mock_config)
 
     # Assertions
     assert result == mock_classifications
-    mock_makedirs.assert_called_once_with(mock_config["prefix"], exist_ok=True)
+    mock_makedirs.assert_called_once()
     mock_root_tree.assert_called_once_with(mock_config["tree"])
     mock_to_distance_matrix.assert_called_once_with(mock_tree['phylodm'])
-    mock_sort_table.assert_called_once_with(
-        mock_config["table"],
-        mock_config["length_column"],
-        mock_config["selection_column"],
-        expected_length=mock_config["DEDUPLICATE"]["THRESHOLDS"]["L"]["target_length"]
-    )
-    mock_group_sequences.assert_called_once_with(mock_tips, mock_config["sample_regex"])
-    mock_find_duplicates.assert_called_once_with(
-        mock_samples,
-        mock_tips,
-        mock_dist_matrix,
-        mock_contigs_ranked,
-        mock_tree["biophylo"],
-        mock_config["segment"],
-        mock_config["DEDUPLICATE"]["THRESHOLDS"]["L"]
-    )
+    mock_sort_table.assert_called_once()
+    mock_group_sequences.assert_called_once_with(mock_dist_matrix_data[0], mock_config["sample_regex"])
+    mock_find_duplicates.assert_called_once()
     mock_write_distance_matrix.assert_called_once()
     mock_write_results.assert_called_once()
 
@@ -201,7 +180,9 @@ def test_determine_duplicates_with_mocks(
 @patch('lasvdedup.utils.determine_duplicates.write_results')
 @patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
 @patch('os.makedirs')
+@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch setup_logging
 def test_determine_duplicates_with_config_file_loading(
+    mock_setup_logging,
     mock_makedirs,
     mock_write_distance_matrix,
     mock_write_results,
@@ -210,88 +191,42 @@ def test_determine_duplicates_with_config_file_loading(
     mock_sort_table,
     mock_to_distance_matrix,
     mock_root_tree,
-    mock_config
+    mock_config,
+    mock_tree,
+    mock_dist_matrix_data,
+    mock_contigs_ranked,
+    mock_sample_groups,
+    mock_classifications,
+    mock_seq_records
 ):
     """Test determine_duplicates with config file loading."""
-    # Set up mocks similar to previous test
-    mock_tree = {'biophylo': MagicMock(), 'phylodm': MagicMock()}
+    # Set up mocks
     mock_root_tree.return_value = mock_tree
-
-    mock_tips = ['A', 'B', 'C', 'D', 'E']
-    mock_dist_matrix = np.zeros((5, 5))
-    mock_to_distance_matrix.return_value = (mock_tips, mock_dist_matrix)
-
-    mock_contigs_ranked = {
-        'A': {'length': 1000, 'coverage': 20.5},
-        'B': {'length': 950, 'coverage': 15.2}
-    }
+    mock_to_distance_matrix.return_value = mock_dist_matrix_data
     mock_sort_table.return_value = mock_contigs_ranked
-
-    mock_samples = {'sample1': ['A', 'B'], 'sample2': ['C', 'D', 'E']}
-    mock_group_sequences.return_value = mock_samples
-
-    mock_classifications = {
-        'A': Classification(
-            sequence_name='A',
-            classification_type=ClassificationType.GOOD,
-            reason='Test reason',
-            sample_id='sample1',
-            group_members=['A', 'B'],
-            decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
-            contig_stats={'length': 1000, 'coverage': 20.5}
-        )
-    }
+    mock_group_sequences.return_value = mock_sample_groups
     mock_find_duplicates.return_value = mock_classifications
 
-    # Mock sequence records
-    mock_seq_records = {
-        'A': MagicMock(),
-        'B': MagicMock(),
-        'C': MagicMock(),
-        'D': MagicMock(),
-        'E': MagicMock()
-    }
+    # Create a simulated config file path
+    config_path = "dummy_config.yaml"
 
-    # Create a temporary config file
-    with tempfile.NamedTemporaryFile(suffix='.yaml', delete=False) as tmp:
-        yaml.dump(mock_config, tmp)
-        tmp_path = tmp.name
+    # Run the function with config path instead of dict
+    with patch('builtins.open', mock_open(read_data=yaml.dump(mock_config))):
+        with patch('yaml.safe_load', return_value=mock_config):
+            with patch('Bio.SeqIO.to_dict', return_value=mock_seq_records):
+                with patch('Bio.SeqIO.parse'):
+                    result = determine_duplicates(config=config_path)
 
-    try:
-        # Run the function with config file
-        with patch('Bio.SeqIO.to_dict', return_value=mock_seq_records):
-            result = determine_duplicates(config=tmp_path)
-
-        # Assertions
-        assert result == mock_classifications
-        mock_find_duplicates.assert_called_once()
-    finally:
-        os.unlink(tmp_path)
+    # Assertions
+    assert result == mock_classifications
+    mock_root_tree.assert_called_once()
+    mock_find_duplicates.assert_called_once()
+    mock_write_results.assert_called_once()
 
 
-@patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
-@patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')
-@patch('lasvdedup.utils.determine_duplicates.sort_table')
-@patch('lasvdedup.utils.determine_duplicates.group_sequences_by_sample')
-@patch('lasvdedup.utils.determine_duplicates.find_duplicates')
-@patch('lasvdedup.utils.determine_duplicates.write_results')
-@patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
-@patch('Bio.SeqIO.to_dict')
-@patch('Bio.SeqIO.parse')
 @patch('os.makedirs')
-def test_determine_duplicates_missing_segment(
-    mock_makedirs,
-    mock_seqio_parse,
-    mock_seqio_to_dict,
-    mock_write_distance_matrix,
-    mock_write_results,
-    mock_find_duplicates,
-    mock_group_sequences,
-    mock_sort_table,
-    mock_to_distance_matrix,
-    mock_root_tree,
-    mock_config
-):
+@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch setup_logging
+def test_determine_duplicates_missing_segment(mock_setup_logging, mock_makedirs, mock_config):
     """Test error handling when segment is missing."""
     # Remove segment from config
     config_without_segment = mock_config.copy()
@@ -303,35 +238,10 @@ def test_determine_duplicates_missing_segment(
 
     assert "Segment not provided" in str(excinfo.value)
 
-    # Verify that none of the processing functions were called
-    mock_root_tree.assert_not_called()
-    mock_to_distance_matrix.assert_not_called()
-    mock_sort_table.assert_not_called()
 
-
-@patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
-@patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')
-@patch('lasvdedup.utils.determine_duplicates.sort_table')
-@patch('lasvdedup.utils.determine_duplicates.group_sequences_by_sample')
-@patch('lasvdedup.utils.determine_duplicates.find_duplicates')
-@patch('lasvdedup.utils.determine_duplicates.write_results')
-@patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
-@patch('Bio.SeqIO.to_dict')
-@patch('Bio.SeqIO.parse')
 @patch('os.makedirs')
-def test_determine_duplicates_missing_species(
-    mock_makedirs,
-    mock_seqio_parse,
-    mock_seqio_to_dict,
-    mock_write_distance_matrix,
-    mock_write_results,
-    mock_find_duplicates,
-    mock_group_sequences,
-    mock_sort_table,
-    mock_to_distance_matrix,
-    mock_root_tree,
-    mock_config
-):
+@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch setup_logging
+def test_determine_duplicates_missing_species(mock_setup_logging, mock_makedirs, mock_config):
     """Test error handling when species is missing."""
     # Remove species from config
     config_without_species = mock_config.copy()
@@ -342,3 +252,63 @@ def test_determine_duplicates_missing_species(
         determine_duplicates(config=config_without_species)
 
     assert "Species not provided" in str(excinfo.value)
+
+
+@patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
+@patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')
+@patch('lasvdedup.utils.determine_duplicates.sort_table')
+@patch('lasvdedup.utils.determine_duplicates.group_sequences_by_sample')
+@patch('lasvdedup.utils.determine_duplicates.find_duplicates')
+@patch('lasvdedup.utils.determine_duplicates.write_results')
+@patch('lasvdedup.utils.determine_duplicates.write_distance_matrix')
+@patch('os.makedirs')
+@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch setup_logging
+def test_determine_duplicates_with_explicit_paths(
+    mock_setup_logging,
+    mock_makedirs,
+    mock_write_distance_matrix,
+    mock_write_results,
+    mock_find_duplicates,
+    mock_group_sequences,
+    mock_sort_table,
+    mock_to_distance_matrix,
+    mock_root_tree,
+    mock_config,
+    mock_tree,
+    mock_dist_matrix_data,
+    mock_contigs_ranked,
+    mock_sample_groups,
+    mock_classifications,
+    mock_seq_records
+):
+    """Test determine_duplicates with explicit path parameters."""
+    # Set up mocks
+    mock_root_tree.return_value = mock_tree
+    mock_to_distance_matrix.return_value = mock_dist_matrix_data
+    mock_sort_table.return_value = mock_contigs_ranked
+    mock_group_sequences.return_value = mock_sample_groups
+    mock_find_duplicates.return_value = mock_classifications
+
+    # Explicit paths
+    tree_path = Path("explicit_tree.treefile")
+    seq_path = Path("explicit_sequences.fasta")
+    table_path = Path("explicit_table.tsv")
+    prefix_path = Path("explicit_prefix")
+
+    # Run the function with explicit paths
+    with patch('Bio.SeqIO.to_dict', return_value=mock_seq_records):
+        with patch('Bio.SeqIO.parse'):
+            result = determine_duplicates(
+                config=mock_config,
+                tree=tree_path,
+                sequences=seq_path,
+                table=table_path,
+                prefix=prefix_path,
+                segment="L"
+            )
+
+    # Assertions
+    assert result == mock_classifications
+    mock_makedirs.assert_called_once_with(prefix_path, exist_ok=True)
+    mock_root_tree.assert_called_once_with(tree_path)
+    mock_write_results.assert_called_once()

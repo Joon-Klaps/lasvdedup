@@ -4,6 +4,7 @@
 import os
 import logging
 import yaml
+from pathlib import Path
 
 from .resources import get_config_path
 
@@ -14,19 +15,20 @@ logger = logging.getLogger("lasvdedup.cli")
 # Format: 'cli_arg_name': ('config_path', transform_function or None)
 # Where config_path is dot notation for nested dict access (empty string for root level)
 PARAMETER_MAPPING = {
+
     # Run command parameters
-    'contigs_table': ('CONTIGS_TABLE', os.path.abspath),
-    'seq_data_dir': ('SEQ_DATA_DIR', os.path.abspath),
-    'base_data_dir': ('BASE_DATA_DIR', os.path.abspath),
-    'outdir': ('OUTDIR', os.path.abspath),
-    'workdir': ('WORKDIR', os.path.abspath),
+    'contigs_table': ('CONTIGS_TABLE', Path),
+    'seq_data_dir': ('SEQ_DATA_DIR', Path),
+    'base_data_dir': ('BASE_DATA_DIR', Path),
+    'outdir': ('OUTDIR', Path),
+    'workdir': ('WORKDIR', Path),
     'threads': ('THREADS', None),
     'force': ('FORCE', None),
 
     # Deduplicate command parameters
-    'tree': ('tree', os.path.abspath),
-    'sequences': ('sequences', os.path.abspath),
-    'table': ('table', os.path.abspath),
+    'tree': ('tree', Path),
+    'sequences': ('sequences', Path),
+    'table': ('table', Path),
     'prefix': ('prefix', None),  # Don't convert prefix to abspath
     'sample_regex': ('DEDUPLICATE.SAMPLE_REGEX', None),
     'selection_column': ('DEDUPLICATE.SELECTION_COLUMN', None),
@@ -34,15 +36,14 @@ PARAMETER_MAPPING = {
     'species': ('SPECIES', None),
     'segment': ('segment', None),
     'log_level': ('LOGLEVEL', None),
+}
 
-    # Threshold parameters are handled specially
-    'thresholds': {
-        'lowerthreshold': ('SPECIAL.LOWER', None),
-        'upperthreshold': ('SPECIAL.UPPER', None),
-        'z_threshold': ('SPECIAL.Z_THRESHOLD', None),
-        'clade_size': ('SPECIAL.CLADE_SIZE', None),
-        'target_length': ('SPECIAL.TARGET_LENGTH', None),
-    }
+THRESHOLD_MAPPING = {
+    'lowerthreshold': 'LOWER',
+    'upperthreshold': 'UPPER',
+    'z_threshold': 'Z_THRESHOLD',
+    'clade_size': 'CLADE_SIZE',
+    'target_length': 'TARGET_LENGTH',
 }
 
 def build_config(args):
@@ -74,7 +75,10 @@ def build_config(args):
             logger.warning("Failed to load default config: %s", e)
 
     # Load custom config if provided (overrides defaults)
-    if args.config and os.path.isfile(args.config):
+    if args.config and isinstance(args.config, dict):
+        config = deep_update(config, args.config)
+
+    elif args.config and os.path.isfile(args.config):
         try:
             with open(args.config) as f:
                 custom_config = yaml.safe_load(f) or {}
@@ -95,7 +99,7 @@ def build_config(args):
     normalized_cli_config = {}
 
     # Special handling for threshold parameters when segment is specified
-    if 'segment' in cli_config and any([k in PARAMETER_MAPPING['thresholds'].items() for k in cli_config]):
+    if 'segment' in cli_config and any([k in THRESHOLD_MAPPING.items() for k in cli_config]):
         segment = cli_config['segment']
         thresholds = {}
 
