@@ -235,7 +235,7 @@ def classify_sample(
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
-            reason=f"Selected as best representative (contig stats: {stats[best_seq]}) from nearly identical sequences (distances < {thresholds['lower']})",
+            reason=f"Selected as best representative (contig stats: {stats[best_seq]}) from nearly identical sequences (distances < {thresholds['LOWER']})",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,  # Set decision category
@@ -246,7 +246,7 @@ def classify_sample(
             classifications[seq] = Classification(
                 sequence_name=seq,
                 classification_type=ClassificationType.BAD,
-                reason=f"Duplicate of {best_seq} (distance < {thresholds['lower']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
+                reason=f"Duplicate of {best_seq} (distance < {thresholds['LOWER']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,  # Set decision category
@@ -270,7 +270,7 @@ def classify_sample(
             classifications[best_seq] = Classification(
                 sequence_name=best_seq,
                 classification_type=ClassificationType.COINFECTION,
-                reason=f"Intrahost variant (distances < {thresholds['upper']}), selected as cluster representative (highest contig stats: {stats[best_seq]})",
+                reason=f"Intrahost variant (distances < {thresholds['UPPER']}), selected as cluster representative (highest contig stats: {stats[best_seq]})",
                 sample_id=sample_id,
                 group_members=cluster,
                 decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,  # Set decision category
@@ -281,7 +281,7 @@ def classify_sample(
                 classifications[seq] = Classification(
                     sequence_name=seq,
                     classification_type=ClassificationType.BAD,
-                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {thresholds['lower']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
+                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {thresholds['LOWER']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
                     sample_id=sample_id,
                     group_members=cluster,
                     decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,  # Set decision category
@@ -320,7 +320,7 @@ def classify_sample(
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
-            reason=f"Small MRCA clade size ({clade_size} ≤ {thresholds['clade_size']}) indicating likely false positive, selected as representative (highest read count: {stats[best_seq]})",
+            reason=f"Small MRCA clade size ({clade_size} ≤ {thresholds['CLADE_SIZE']}) indicating likely false positive, selected as representative (highest read count: {stats[best_seq]})",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
@@ -331,7 +331,7 @@ def classify_sample(
             classifications[seq] = Classification(
                 sequence_name=seq,
                 classification_type=ClassificationType.BAD,
-                reason=f"Likely false positive with small MRCA clade size ({clade_size} ≤ {thresholds['clade_size']}), {best_seq} selected instead (higher read count)",
+                reason=f"Likely false positive with small MRCA clade size ({clade_size} ≤ {thresholds['CLADE_SIZE']}), {best_seq} selected instead (higher read count)",
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
@@ -397,7 +397,7 @@ def classify_sample(
         classifications[seq] = Classification(
             sequence_name=seq,
             classification_type=ClassificationType.COINFECTION,
-            reason=f"True coinfection: large MRCA clade size ({clade_size} > {thresholds['clade_size']}) and no outliers detected",
+            reason=f"True coinfection: large MRCA clade size ({clade_size} > {thresholds['CLADE_SIZE']}) and no outliers detected",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.TRUE_COINFECTION,  # Set decision category
