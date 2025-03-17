@@ -7,19 +7,19 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from lasvdedup.utils.io_utils import (
-    load_read_counts,
+    sort_table,
     write_results,
     write_distance_matrix
 )
 from lasvdedup.utils.classification import Classification, ClassificationType, DecisionCategory
 
-def test_load_read_counts():
-    """Test loading read counts from a contigs table."""
+def test_sort_table():
+    """Test sorting contigs table by length and selection criteria."""
     # Create a test DataFrame
     data = {
         'index': ['seq1', 'seq2', 'seq3'],
-        'reads': [100, 200, 300],
-        'another_reads_column': [50, 150, 250]
+        'length': [7000, 6800, 7200],
+        'coverage': [20.5, 15.2, 18.7]
     }
     df = pd.DataFrame(data)
 
@@ -29,23 +29,25 @@ def test_load_read_counts():
         tmp_path = Path(tmp.name)
 
     try:
-        # Test with direct column name
-        result = load_read_counts(tmp_path, 'reads')
+        # Test with length column and coverage as selection column
+        result = sort_table(tmp_path, 'length', ['coverage'], expected_length=7000)
         assert len(result) == 3
-        assert result['seq1']['reads'] == 100
-        assert result['seq2']['reads'] == 200
-        assert result['seq3']['reads'] == 300
 
-        # Test with different column name
-        result = load_read_counts(tmp_path, 'another_reads_column')
-        assert len(result) == 3
-        assert result['seq1']['reads'] == 50
-        assert result['seq2']['reads'] == 150
-        assert result['seq3']['reads'] == 250
+        # seq1 should be ranked first (exact match to expected length and highest coverage)
+        assert result['seq1']['rank'] == 1
+        assert result['seq1']['distance_to_expectation'] == 0
+        assert result['seq1']['coverage'] == 20.5
 
-        # Test with column not found
+        # seq3 should be ranked lower due to distance from expected length
+        assert 'seq3' in result
+
+        # Test with invalid length column
         with pytest.raises(ValueError):
-            load_read_counts(tmp_path, 'nonexistent_column')
+            sort_table(tmp_path, 'nonexistent_column', ['coverage'], expected_length=7000)
+
+        # Test with invalid selection column
+        with pytest.raises(ValueError):
+            sort_table(tmp_path, 'length', ['nonexistent_column'], expected_length=7000)
 
     finally:
         # Clean up
@@ -53,7 +55,7 @@ def test_load_read_counts():
 
 def test_write_results():
     """Test writing classification results to file."""
-    # Create test classifications
+    # Create test classifications with contig_stats instead of read_count
     classifications = {
         'seq1': Classification(
             sequence_name='seq1',
@@ -62,7 +64,7 @@ def test_write_results():
             sample_id='sample1',
             group_members=['seq1', 'seq2'],
             decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
-            read_count=100
+            contig_stats={'length': 7000, 'coverage': 20.5}
         ),
         'seq2': Classification(
             sequence_name='seq2',
@@ -71,7 +73,7 @@ def test_write_results():
             sample_id='sample1',
             group_members=['seq1', 'seq2'],
             decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
-            read_count=50
+            contig_stats={'length': 6800, 'coverage': 15.2}
         ),
         'seq3': Classification(
             sequence_name='seq3',
@@ -80,7 +82,7 @@ def test_write_results():
             sample_id='sample2',
             group_members=['seq3'],
             decision_category=DecisionCategory.TRUE_COINFECTION,
-            read_count=200
+            contig_stats={'length': 7200, 'coverage': 18.7}
         )
     }
 
@@ -112,6 +114,15 @@ def test_write_results():
 
             # Check that sequences were written
             assert mock_write.call_count == 3
+
+            # Verify the paths used for writing sequences
+            calls = mock_write.call_args_list
+            output_paths = [call[0][2] for call in calls]
+
+            # Check that files were written to the correct directories
+            assert any('sample1/good' in path for path in output_paths)
+            assert any('sample1/bad' in path for path in output_paths)
+            assert any('sample2/good' in path for path in output_paths)  # coinfection goes to 'good'
 
 def test_write_distance_matrix():
     """Test writing a distance matrix to file."""
