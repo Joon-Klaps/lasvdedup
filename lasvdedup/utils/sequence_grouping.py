@@ -230,7 +230,7 @@ def classify_sample(
     # Case 1: All distances below lower threshold (simple duplicates)
     if is_all_distances_below_threshold(distances, thresholds["lower"]):
         logger.debug("Sample %s: All sequences are similar (below lower threshold)", sample_id)
-        best_seq = select_best_sequence(seq_names, stats, segment)
+        best_seq = select_best_sequence(seq_names, stats)
 
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
@@ -265,7 +265,7 @@ def classify_sample(
         # For each cluster, keep the sequence with highest contig stats
         for cluster in clusters:
             cluster_stats = {seq: stats[seq] for seq in cluster}
-            best_seq = select_best_sequence(cluster, cluster_stats, segment)
+            best_seq = select_best_sequence(cluster, cluster_stats)
 
             classifications[best_seq] = Classification(
                 sequence_name=best_seq,
@@ -304,7 +304,7 @@ def classify_sample(
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.NO_TREE,  # Set decision category
-                contig_stats=reads[seq]
+                contig_stats=stats[seq]
             )
         return classifications
 
@@ -313,29 +313,29 @@ def classify_sample(
     clade_size = len(clade_members)
 
     # Case 4: Small MRCA clade (likely false positive)
-    if clade_size <= min_clade_size:
+    if clade_size <= thresholds["clade_size"]:
         logger.debug("Sample %s: Small MRCA clade size (%d) - likely false positive", sample_id, clade_size)
 
-        best_seq = select_best_sequence(seq_names, contigs_ranked, segment)
+        best_seq = select_best_sequence(seq_names, contigs_ranked)
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
-            reason=f"Small MRCA clade size ({clade_size} ≤ {min_clade_size}) indicating likely false positive, selected as representative (highest read count: {reads[best_seq]})",
+            reason=f"Small MRCA clade size ({clade_size} ≤ {thresholds['clade_size']}) indicating likely false positive, selected as representative (highest read count: {stats[best_seq]})",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
-            contig_stats=reads[best_seq]
+            contig_stats=stats[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
             classifications[seq] = Classification(
                 sequence_name=seq,
                 classification_type=ClassificationType.BAD,
-                reason=f"Likely false positive with small MRCA clade size ({clade_size} ≤ {min_clade_size}), {best_seq} selected instead (higher read count)",
+                reason=f"Likely false positive with small MRCA clade size ({clade_size} ≤ {thresholds['clade_size']}), {best_seq} selected instead (higher read count)",
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
-                contig_stats=reads[seq]
+                contig_stats=stats[seq]
             )
 
         return classifications
@@ -343,7 +343,7 @@ def classify_sample(
     # Case 5: Check for outliers - use the provided z_threshold parameter
     logger.debug("Sample %s: Large MRCA clade size (%d) - checking for outliers", sample_id, clade_size)
 
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold)
+    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["z_threshold"])
 
     if outliers:
         outlier_names = ", ".join(outliers.keys())
@@ -353,7 +353,7 @@ def classify_sample(
         if not good_seqs:
             logger.error("No good sequences found after removing outliers: %s", outlier_names)
 
-        best_seq = select_best_sequence(good_seqs, contigs_ranked, segment)
+        best_seq = select_best_sequence(good_seqs, contigs_ranked)
 
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
@@ -362,7 +362,7 @@ def classify_sample(
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.OUTLIERS_DETECTED,
-            contig_stats=reads[best_seq]
+            contig_stats=stats[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
@@ -375,17 +375,17 @@ def classify_sample(
                     sample_id=sample_id,
                     group_members=group_members,
                     decision_category=DecisionCategory.OUTLIERS_DETECTED,
-                    contig_stats=reads[seq]
+                    contig_stats=stats[seq]
                 )
             else:
                 classifications[seq] = Classification(
                     sequence_name=seq,
                     classification_type=ClassificationType.BAD,
-                    reason=f"Non-outlier but with lower read count ({reads[seq]}) than {best_seq} ({reads[best_seq]})",
+                    reason=f"Non-outlier but with lower read count ({stats[seq]}) than {best_seq} ({stats[best_seq]})",
                     sample_id=sample_id,
                     group_members=group_members,
                     decision_category=DecisionCategory.OUTLIERS_DETECTED,
-                    contig_stats=reads[seq]
+                    contig_stats=stats[seq]
                 )
 
         return classifications
@@ -397,11 +397,11 @@ def classify_sample(
         classifications[seq] = Classification(
             sequence_name=seq,
             classification_type=ClassificationType.COINFECTION,
-            reason=f"True coinfection: large MRCA clade size ({clade_size} > {min_clade_size}) and no outliers detected",
+            reason=f"True coinfection: large MRCA clade size ({clade_size} > {thresholds['clade_size']}) and no outliers detected",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.TRUE_COINFECTION,  # Set decision category
-            contig_stats=reads[seq]
+            contig_stats=stats[seq]
         )
 
     return classifications
