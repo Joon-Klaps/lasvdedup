@@ -37,8 +37,7 @@ def sort_table(table_path: Path, length_column:str,
         logger.error("Selection column %s not found in table: %s", badcolumns, table_path)
         raise ValueError(f"Selection column {badcolumns} not found in table: {table_path}")
 
-    # Filter contigs by length
-    contigs_df["distance_to_expectation"] = abs(contigs_df[length_column] - expected_length)
+    logger.info("Sorted contigs by distance to expected length and selection columns")
 
     # Filter contigs by selection columns
     rank_columns= ["distance_to_expectation"] + selection_columns

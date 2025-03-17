@@ -26,12 +26,12 @@ PARAMETER_MAPPING = {
     'force': ('FORCE', None),
 
     # Deduplicate command parameters
-    'tree': ('tree', Path),
-    'sequences': ('sequences', Path),
-    'table': ('table', Path),
-    'prefix': ('prefix', None),  # Don't convert prefix to abspath
+    'tree': ('TREE', Path),
+    'sequences': ('SEQUENCES', Path),
+    'table': ('CONTIGS_TABLE', Path),
+    'prefix': ('PREFIX', None),  # Don't convert prefix to abspath
     'sample_regex': ('DEDUPLICATE.SAMPLE_REGEX', None),
-    'selection_column': ('DEDUPLICATE.SELECTION_COLUMN', None),
+    'selection_column': ('DEDUPLICATE.SELECTION_COLUMNS', None),
     'length_column': ('DEDUPLICATE.LENGTH_COLUMN', None),
     'species': ('SPECIES', None),
     'segment': ('segment', None),

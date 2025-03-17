@@ -344,10 +344,10 @@ def mock_dependencies():
     }
 
     mock_thresholds = {
-        "lower": 0.02,
-        "upper": 0.05,
-        "clade_size": 5,
-        "z_threshold": 3.0
+        "LOWER": 0.02,
+        "UPPER": 0.05,
+        "CLADE_SIZE": 5,
+        "Z_THRESHOLD": 3.0
     }
 
     # Mock functions
@@ -389,10 +389,10 @@ class TestFindDuplicates:
         mock_tree = MagicMock()
 
         thresholds = {
-            "lower": 0.02,
-            "upper": 0.05,
-            "clade_size": 5,
-            "z_threshold": 3.0
+            "LOWER": 0.02,
+            "UPPER": 0.05,
+            "CLADE_SIZE": 5,
+            "Z_THRESHOLD": 3.0
         }
 
         return {
@@ -558,10 +558,10 @@ class TestClassifySample:
         mock_tree = MagicMock()
 
         thresholds = {
-            "lower": 0.02,
-            "upper": 0.05,
-            "clade_size": 5,
-            "z_threshold": 3.0
+            "LOWER": 0.02,
+            "UPPER": 0.05,
+            "CLADE_SIZE": 5,
+            "Z_THRESHOLD": 3.0
         }
 
         return {

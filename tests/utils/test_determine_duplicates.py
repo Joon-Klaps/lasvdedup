@@ -15,31 +15,31 @@ from lasvdedup.utils.classification import Classification, ClassificationType, D
 def mock_config():
     """Create a mock config dictionary with proper paths."""
     return {
-        "tree": str(Path("tree_path.treefile")),
-        "sequences": str(Path("sequences.fasta")),
-        "table": str(Path("contigs.tsv")),
-        "prefix": str(Path("output_directory")),
-        "species": "LASV",
+        "TREE": str(Path("tree_path.treefile")),
+        "SEQUENCES": str(Path("sequences.fasta")),
+        "CONTIGS_TABLE": str(Path("contigs.tsv")),
+        "PREFIX": str(Path("output_directory")),
+        "SPECIES": "LASV",
         "segment": "L",
-        "sample_regex": r"(\w+)_.*",
-        "length_column": "length",
-        "selection_column": ["coverage"],
-        "log_level": "INFO",
+        "SAMPLE_REGEX": r"(\w+)_.*",
+        "LENGTH_COLUMN": "length",
+        "SELECTION_COLUMNS": ["COVERAGE"],
+        "LOGLEVEL": "INFO",
         "DEDUPLICATE": {
             "THRESHOLDS": {
                 "L": {
-                    "lower_threshold": 0.01,
-                    "upper_threshold": 0.03,
-                    "clade_size": 15,
-                    "z_threshold": 2.5,
-                    "target_length": 7000
+                    "LOWER": 0.01,
+                    "UPPER": 0.03,
+                    "CLADE_SIZE": 15,
+                    "Z_THRESHOLD": 2.5,
+                    "TARGET_LENGTH": 7000
                 },
                 "S": {
-                    "lower_threshold": 0.03,
-                    "upper_threshold": 0.07,
-                    "clade_size": 8,
-                    "z_threshold": 1.8,
-                    "target_length": 3500
+                    "LOWER": 0.03,
+                    "UPPER": 0.07,
+                    "CLADE_SIZE": 8,
+                    "Z_THRESHOLD": 1.8,
+                    "TARGET_LENGTH": 3500
                 }
             }
         }
@@ -49,7 +49,7 @@ def mock_config():
 @pytest.fixture
 def mock_tree():
     """Create a mock tree object."""
-    return {'biophylo': MagicMock(), 'phylodm': MagicMock()}
+    return {'BIOPHYLO': MagicMock(), 'PHYLODM': MagicMock()}
 
 
 @pytest.fixture
@@ -163,10 +163,10 @@ def test_determine_duplicates_with_mocks(
     # Assertions
     assert result == mock_classifications
     mock_makedirs.assert_called_once()
-    mock_root_tree.assert_called_once_with(mock_config["tree"])
-    mock_to_distance_matrix.assert_called_once_with(mock_tree['phylodm'])
+    mock_root_tree.assert_called_once_with(mock_config["TREE"])
+    mock_to_distance_matrix.assert_called_once_with(mock_tree['PHYLODM'])
     mock_sort_table.assert_called_once()
-    mock_group_sequences.assert_called_once_with(mock_dist_matrix_data[0], mock_config["sample_regex"])
+    mock_group_sequences.assert_called_once_with(mock_dist_matrix_data[0], mock_config["SAMPLE_REGEX"])
     mock_find_duplicates.assert_called_once()
     mock_write_distance_matrix.assert_called_once()
     mock_write_results.assert_called_once()
@@ -245,7 +245,7 @@ def test_determine_duplicates_missing_species(mock_setup_logging, mock_makedirs,
     """Test error handling when species is missing."""
     # Remove species from config
     config_without_species = mock_config.copy()
-    del config_without_species["species"]
+    del config_without_species["SPECIES"]
 
     # Expect ValueError
     with pytest.raises(ValueError) as excinfo:

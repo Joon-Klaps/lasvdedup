@@ -7,6 +7,7 @@ import yaml
 from Bio import SeqIO
 from pathlib import Path
 from typing import Dict, Union
+import pprint
 
 # Import sub utility functions
 from .tree_utils import root_tree_at_midpoint
@@ -75,15 +76,17 @@ def determine_duplicates(
     args.command = None
     config = build_config(args)
 
+    pprint.pprint(config)
+
     # Create output directory if it doesn't exist
-    prefix = Path(config["prefix"])
+    prefix = Path(config["PREFIX"])
     os.makedirs(prefix, exist_ok=True)
 
     # Extract segment for threshold determination
     if (segment := config.get("segment")) is None:
         raise ValueError("Segment not provided in config or CLI arguments")
 
-    if (species := config.get("species")) is None:
+    if (species := config.get("SPECIES")) is None:
         raise ValueError("Species not provided in config or CLI arguments")
 
     # Setup logging
@@ -102,26 +105,27 @@ def determine_duplicates(
     start_time = time.time()
 
     # Load and root the tree using the modular function
-    tree_path = config["tree"]
+    tree_path = config["TREE"]
     tree = root_tree_at_midpoint(tree_path)
 
     # Calculate distances from tree
-    tips, dist_matrix = to_distance_matrix(tree["phylodm"])
+    tips, dist_matrix = to_distance_matrix(tree["PHYLODM"])
 
     # Write distance matrix to file
     write_distance_matrix(dist_matrix, tips, str(prefix / "distance_matrix.mldist"))
 
     # Load read counts and coverage from contigs table
-    if (length_column := config.get("length_column")) is None:
-        logger.error("Length column not found in config or CLI arguments")
-    selection_columns = config.get("selection_column") or []
+    if (length_column := config["DEDUPLICATE"]["LENGTH_COLUMN"]) is None:
+        logger.error("LENGTH_COLUMN not found in config or CLI arguments")
+    if not (selection_columns := config["DEDUPLICATE"]["SELECTION_COLUMNS"] or []):
+        logger.warning("No selection columns found in config or CLI arguments")
 
     # Create dictionary of all contigs with their rank {sample: {rank: x, ...}}
-    contig_table = config["table"]
+    contig_table = config["TABLE"]
     contigs_ranked = sort_table(contig_table, length_column,
-        selection_columns, expected_length = thresholds["target_length"])
+        selection_columns, expected_length=thresholds["TARGET_LENGTH"])
 
-    sample_regex = config.get("sample_regex", r'(LVE\d+)_.*')
+    sample_regex = config["DEDUPLICATE"]["SAMPLE_REGEX"] or r'(LVE\d+)_.*'
 
     # Group sequences by sample
     sample_to_seqs = group_sequences_by_sample(tips, sample_regex)
@@ -129,11 +133,11 @@ def determine_duplicates(
     # Find duplicates with the determined thresholds - pass segment parameter
     classifications = find_duplicates(
         sample_to_seqs, tips, dist_matrix, contigs_ranked,
-        tree["biophylo"], segment, thresholds
+        tree["BIOPHYLO"], segment, thresholds
         )
 
     # Write results to output files
-    sequence_path = config["sequences"]
+    sequence_path = config["SEQUENCES"]
     logger.info("Loading sequences from %s", sequence_path)
     seq_records = SeqIO.to_dict(SeqIO.parse(str(sequence_path), "fasta"))
     write_results(classifications, seq_records, species, segment, prefix, sample_regex)

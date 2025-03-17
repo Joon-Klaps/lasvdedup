@@ -18,7 +18,7 @@ def root_tree_at_midpoint(tree_path: Path) -> PhyloDM:
     # Root the tree at midpoint
     logger.info("Rooting tree at midpoint")
     bio_tree.root_at_midpoint()
-    tree["biophylo"] = bio_tree
+    tree["BIOPHYLO"] = bio_tree
 
     # Write the rooted tree to a temporary file
     with tempfile.NamedTemporaryFile(suffix='.treefile', delete=False) as tmp_tree_file:
@@ -27,7 +27,7 @@ def root_tree_at_midpoint(tree_path: Path) -> PhyloDM:
 
     # Load the rooted tree with PhyloDM
     logger.info("Loading rooted tree into PhyloDM")
-    tree["phylodm"] = PhyloDM.load_from_newick_path(rooted_tree_path)
+    tree["PHLYODM"] = PhyloDM.load_from_newick_path(rooted_tree_path)
 
     # Clean up the temporary file
     try:

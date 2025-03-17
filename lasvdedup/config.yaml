@@ -19,7 +19,7 @@ MAFFT:
 
 IQTREE:
   MODEL: "GTR+F+R9"
-  BOOTSTRAPS: 1000
+  EXTRA_PARAMS: "-B 1000"
 
 # Sequence analysis settings
 DEDUPLICATE:
@@ -41,11 +41,3 @@ DEDUPLICATE:
       CLADE_SIZE: 8
       Z_THRESHOLD: 2.0
       TARGET_LENGTH: 3400
-
-  # Default thresholds for segments not explicitly defined
-  DEFAULT_THRESHOLD:
-      LOWER: 0.01
-      UPPER: 0.02
-      CLADE_SIZE: 8
-      Z_THRESHOLD: 2.0
-      TARGET_LENGTH: 5000

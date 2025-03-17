@@ -228,7 +228,7 @@ def classify_sample(
     stats = {seq: get_contig_data(seq, contigs_ranked) for seq in seq_names}
 
     # Case 1: All distances below lower threshold (simple duplicates)
-    if is_all_distances_below_threshold(distances, thresholds["lower"]):
+    if is_all_distances_below_threshold(distances, thresholds["LOWER"]):
         logger.debug("Sample %s: All sequences are similar (below lower threshold)", sample_id)
         best_seq = select_best_sequence(seq_names, stats)
 
@@ -256,11 +256,11 @@ def classify_sample(
         return classifications
 
     # Case 2: All distances below upper threshold (potential intrahost variants)
-    if is_all_distances_below_threshold(distances, thresholds["upper"]):
+    if is_all_distances_below_threshold(distances, thresholds["UPPER"]):
         logger.debug("Sample %s: Potential intrahost variants (below upper threshold)", sample_id)
 
         # Group sequences into clusters based on lower threshold
-        clusters = cluster_sequences(seq_names, tips_lookup, dist_matrix, thresholds["lower"])
+        clusters = cluster_sequences(seq_names, tips_lookup, dist_matrix, thresholds["LOWER"])
 
         # For each cluster, keep the sequence with highest contig stats
         for cluster in clusters:
@@ -313,7 +313,7 @@ def classify_sample(
     clade_size = len(clade_members)
 
     # Case 4: Small MRCA clade (likely false positive)
-    if clade_size <= thresholds["clade_size"]:
+    if clade_size <= thresholds["CLADE_SIZE"]:
         logger.debug("Sample %s: Small MRCA clade size (%d) - likely false positive", sample_id, clade_size)
 
         best_seq = select_best_sequence(seq_names, contigs_ranked)
@@ -343,7 +343,7 @@ def classify_sample(
     # Case 5: Check for outliers - use the provided z_threshold parameter
     logger.debug("Sample %s: Large MRCA clade size (%d) - checking for outliers", sample_id, clade_size)
 
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["z_threshold"])
+    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["Z_THRESHOLD"])
 
     if outliers:
         outlier_names = ", ".join(outliers.keys())
