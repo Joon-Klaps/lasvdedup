@@ -44,6 +44,7 @@ def parse_args():
     run_parser.add_argument('--threads', '-t', type=int, help='Number of threads to use')
     run_parser.add_argument('--force', '-f', action='store_true', help='Force rerun all jobs')
     run_parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
+    run_parser.add_argument("-l", "--log-level", help="The desired log level (default WARNING).", choices=("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"), default="WARNING")
 
     # Deduplicate command
     dedup_parser = subparsers.add_parser('deduplicate', help='Run just the deduplication step')

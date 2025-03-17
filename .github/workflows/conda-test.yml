@@ -72,4 +72,4 @@ jobs:
       run: |
         conda activate lasvdedup-env
         cd tests/data/
-        lasvdedup --input contigs-test.tsv --seq-dir seq_data  --config test-config.yaml
+        lasvdedup --input contigs-test.tsv --seq-dir seq_data  --config test-config.yaml --log-level DEBUG

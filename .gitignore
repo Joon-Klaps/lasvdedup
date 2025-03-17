@@ -12,5 +12,5 @@ raw/
 .snakemake
 iqtree-out/
 .pytest_cache/
-
+.test-work/
 .DS_Store

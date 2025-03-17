@@ -24,6 +24,14 @@ def run_pipeline(config, dry_run=False):
     threads = config.get("THREADS", 1)
     force = config.get("FORCE", False)
 
+    # Convert workdir to absolute path
+    workdir = os.path.abspath(workdir)
+
+    # Resolve relative paths in config for input files
+    for key in ["CONTIGS_TABLE", "SEQ_DATA_DIR"]:
+        if key in config and isinstance(config[key], (str, Path)) and not os.path.isabs(str(config[key])):
+            config[key] = os.path.abspath(str(config[key]))
+
     # Prepare snakemake arguments
     snakemake_args = {
         'snakefile': str(snakefile),
@@ -33,7 +41,6 @@ def run_pipeline(config, dry_run=False):
         'dryrun': dry_run,
         'printshellcmds': True,
         'workdir': workdir,
-
     }
 
     try:
