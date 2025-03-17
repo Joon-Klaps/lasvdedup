@@ -7,7 +7,7 @@ from lasvdedup.utils.sequence_grouping import (
     group_sequences_by_sample,
     is_all_distances_below_threshold,
     select_best_sequence,
-    get_reads,
+    get_contig_data,  # Changed from get_reads
     cluster_sequences,
     find_duplicates,
     classify_sample
@@ -125,115 +125,134 @@ class TestSelectBestSequence:
     def test_basic_selection(self):
         """Test basic selection of best sequence."""
         seq_names = ['seqA', 'seqB', 'seqC']
-        reads = {'seqA': 100, 'seqB': 200, 'seqC': 50}
+        seq_data = {
+            'seqA': {'rank': 2, 'reads': 100},
+            'seqB': {'rank': 1, 'reads': 200},
+            'seqC': {'rank': 3, 'reads': 50}
+        }
 
-        best_seq = select_best_sequence(seq_names, reads)
-        assert best_seq == 'seqB'  # seqB has the highest count (200)
+        best_seq = select_best_sequence(seq_names, seq_data)
+        assert best_seq == 'seqB'  # seqB has the lowest rank (1)
 
         # Test with tie (should take the first encountered)
-        reads = {'seqA': 200, 'seqB': 200, 'seqC': 50}
-        best_seq = select_best_sequence(seq_names, reads)
+        seq_data = {
+            'seqA': {'rank': 1, 'reads': 200},
+            'seqB': {'rank': 1, 'reads': 200},
+            'seqC': {'rank': 3, 'reads': 50}
+        }
+        best_seq = select_best_sequence(seq_names, seq_data)
         assert best_seq in ['seqA', 'seqB']  # Either could be selected in case of tie
 
-    def test_with_string_reads(self):
+    def test_with_string_ranks(self):
         """Test with string values instead of integers (robustness test)."""
         seq_names = ['seqA', 'seqB', 'seqC']
-        reads = {'seqA': '100', 'seqB': '200', 'seqC': '50'}
+        seq_data = {
+            'seqA': {'rank': '100'},
+            'seqB': {'rank': '200'},
+            'seqC': {'rank': '50'}
+        }
 
         with pytest.raises(TypeError):
-            select_best_sequence(seq_names, reads)
+            select_best_sequence(seq_names, seq_data)
 
     def test_with_empty_sequence_list(self):
         """Test behavior with empty sequence list."""
         with pytest.raises(ValueError):
-            select_best_sequence([], {'seqA': 100})
+            select_best_sequence([], {'seqA': {'rank': 1}})
 
-    def test_with_missing_read_counts(self):
-        """Test behavior when some sequences don't have read counts."""
+    def test_with_missing_rank_data(self):
+        """Test behavior when some sequences don't have rank data."""
         seq_names = ['seqA', 'seqB', 'seqC']
-        reads = {'seqA': 100, 'seqC': 50}  # seqB missing
+        seq_data = {
+            'seqA': {'rank': 1},
+            'seqC': {'rank': 3}  # seqB missing
+        }
 
         with pytest.raises(KeyError):
-            select_best_sequence(seq_names, reads)
+            select_best_sequence(seq_names, seq_data)
 
-    def test_with_infinity_reads(self):
-        """Test with infinite read count (edge case)."""
+    def test_with_infinity_rank(self):
+        """Test with infinite rank value (edge case)."""
         seq_names = ['seqA', 'seqB', 'seqC']
-        reads = {'seqA': 100, 'seqB': float('inf'), 'seqC': 50}
+        seq_data = {
+            'seqA': {'rank': 100},
+            'seqB': {'rank': float('-inf')},  # Lower rank is better
+            'seqC': {'rank': 50}
+        }
 
-        best_seq = select_best_sequence(seq_names, reads)
+        best_seq = select_best_sequence(seq_names, seq_data)
         assert best_seq == 'seqB'
 
 
-class TestGetReads:
-    """Tests for get_reads function."""
+class TestGetContigData:
+    """Tests for get_contig_data function."""
 
-    def test_basic_reads(self):
-        """Test basic read count retrieval."""
-        contig_to_reads = {
-            'seq1': {'reads': 100},
-            'seq2': {'reads': 200},
-            'seq3.suffix': {'reads': 300}
+    def test_basic_contig_data(self):
+        """Test basic contig data retrieval."""
+        contigs_ranked = {
+            'seq1': {'reads': 100, 'coverage': 95.5, 'rank': 2},
+            'seq2': {'reads': 200, 'coverage': 98.0, 'rank': 1},
+            'seq3': {'reads': 300, 'coverage': 97.0, 'rank': 3}
         }
 
         # Direct match
-        assert get_reads('seq1', contig_to_reads) == 100
+        assert get_contig_data('seq1', contigs_ranked) == {'reads': 100, 'coverage': 95.5, 'rank': 2}
 
         # Match after _R_ replacement
-        assert get_reads('_R_seq2', contig_to_reads) == 200
+        assert get_contig_data('_R_seq2', contigs_ranked)['reads'] == 200
 
         # Match with splitting
-        assert get_reads('seq3.suffix.moretext', contig_to_reads) == 300
+        assert get_contig_data('seq3.suffix', contigs_ranked)['rank'] == 3
 
         # Not found
         with pytest.raises(ValueError):
-            get_reads('notfound', contig_to_reads)
+            get_contig_data('notfound', contigs_ranked)
 
     def test_with_complex_name_handling(self):
         """Test more complex sequence name handling scenarios."""
-        contig_to_reads = {
-            'seq1': {'reads': 100},
-            'seq2_with_suffix': {'reads': 200},
-            'seq3.part1.part2': {'reads': 300}
+        contigs_ranked = {
+            'seq1': {'reads': 100, 'rank': 3},
+            'seq2_with_suffix': {'reads': 200, 'rank': 1},
+            'seq3.part1': {'reads': 300, 'rank': 2}
         }
 
-        # Test with _R_ replacement and additional parts
-        assert get_reads('_R_seq1.additional', contig_to_reads) == 100
+        # Test with _R_ replacement
+        result = get_contig_data('_R_seq1', contigs_ranked)
+        assert result['reads'] == 100
+        assert result['rank'] == 3
 
         # Test with partial match after split
-        assert get_reads('seq3.part1.part2.extra', contig_to_reads) == 300
+        result = get_contig_data('seq3.part1.extra', contigs_ranked)
+        assert result['reads'] == 300
+        assert result['rank'] == 2
 
         # Test with combination of replacements
-        assert get_reads('_R_seq2_with_suffix.extra', contig_to_reads) == 200
+        result = get_contig_data('_R_seq2_with_suffix', contigs_ranked)
+        assert result['reads'] == 200
+        assert result['rank'] == 1
 
     def test_edge_cases(self):
-        """Test edge cases for the get_reads function."""
-        contig_to_reads = {
-            'empty': {'reads': 0},
-            'negative': {'reads': -10},
-            'seq.with.dots': {'reads': 500}
+        """Test edge cases for the get_contig_data function."""
+        contigs_ranked = {
+            'empty': {'reads': 0, 'rank': 3},
+            'negative': {'reads': -10, 'rank': 2},
+            'seq.with.dots': {'reads': 500, 'rank': 1}
         }
 
         # Test with zero reads
-        assert get_reads('empty', contig_to_reads) == 0
+        result = get_contig_data('empty', contigs_ranked)
+        assert result['reads'] == 0
+        assert result['rank'] == 3
 
-        # Test with negative reads (shouldn't occur in real data)
-        assert get_reads('negative', contig_to_reads) == -10
+        # Test with negative reads
+        result = get_contig_data('negative', contigs_ranked)
+        assert result['reads'] == -10
+        assert result['rank'] == 2
 
-        # Test with dots in both name and lookup
-        assert get_reads('seq.with.dots.extra', contig_to_reads) == 500
-
-    def test_different_dictionary_structures(self):
-        """Test with different contig_to_reads dictionary structures."""
-        # Missing 'reads' key
-        contig_to_reads = {'seq1': {}}
-        with pytest.raises(KeyError):
-            get_reads('seq1', contig_to_reads)
-
-        # Direct integer instead of dict
-        contig_to_reads = {'seq1': 100}
-        with pytest.raises(TypeError):
-            get_reads('seq1', contig_to_reads)
+        # Test with dots in name
+        result = get_contig_data('seq.with.dots.extra', contigs_ranked)
+        assert result['reads'] == 500
+        assert result['rank'] == 1
 
 
 class TestClusterSequences:
@@ -330,10 +349,17 @@ def mock_dependencies():
         [0.1, 0.1, 0.0]
     ])
     mock_tips_lookup = {'seq1': 0, 'seq2': 1, 'seq3': 2}
-    mock_contig_to_reads = {
-        'seq1': {'reads': 100},
-        'seq2': {'reads': 200},
-        'seq3': {'reads': 150}
+    mock_contigs_ranked = {
+        'seq1': {'reads': 100, 'coverage': 95.0, 'rank': 3},
+        'seq2': {'reads': 200, 'coverage': 98.0, 'rank': 1},
+        'seq3': {'reads': 150, 'coverage': 96.0, 'rank': 2}
+    }
+
+    mock_thresholds = {
+        "lower": 0.02,
+        "upper": 0.05,
+        "clade_size": 5,
+        "z_threshold": 3.0
     }
 
     # Mock functions
@@ -343,8 +369,9 @@ def mock_dependencies():
             'tree': mock_tree,
             'dist_matrix': mock_dist_matrix,
             'tips_lookup': mock_tips_lookup,
-            'contig_to_reads': mock_contig_to_reads,
-            'mock_mrca': mock_mrca
+            'contigs_ranked': mock_contigs_ranked,
+            'mock_mrca': mock_mrca,
+            'thresholds': mock_thresholds
         }
 
 
@@ -362,22 +389,30 @@ class TestFindDuplicates:
             [0.50, 0.51, 0.52, 0.0]
         ])
 
-        contig_to_reads = {
-            'seqA': {'reads': 100},
-            'seqB': {'reads': 200},
-            'seqC': {'reads': 150},
-            'seqD': {'reads': 300}
+        contigs_ranked = {
+            'seqA': {'reads': 100, 'coverage': 95.0, 'rank': 3},
+            'seqB': {'reads': 200, 'coverage': 98.0, 'rank': 1},
+            'seqC': {'reads': 150, 'coverage': 96.0, 'rank': 2},
+            'seqD': {'reads': 300, 'coverage': 97.0, 'rank': 4}
         }
 
         tips = ['seqA', 'seqB', 'seqC', 'seqD']
 
         mock_tree = MagicMock()
 
+        thresholds = {
+            "lower": 0.02,
+            "upper": 0.05,
+            "clade_size": 5,
+            "z_threshold": 3.0
+        }
+
         return {
             'dist_matrix': dist_matrix,
-            'contig_to_reads': contig_to_reads,
+            'contigs_ranked': contigs_ranked,
             'tips': tips,
-            'tree': mock_tree
+            'tree': mock_tree,
+            'thresholds': thresholds
         }
 
     def test_basic_find_duplicates(self, mock_dependencies):
@@ -395,26 +430,33 @@ class TestFindDuplicates:
                 {
                     'seq1': Classification(
                         'seq1', ClassificationType.GOOD, 'test reason', 'sample1',
-                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD, 100
+                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD,
+                        {'reads': 100, 'rank': 3}
                     ),
                     'seq2': Classification(
                         'seq2', ClassificationType.BAD, 'test reason', 'sample1',
-                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD, 200
+                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD,
+                        {'reads': 200, 'rank': 1}
                     )
                 },
                 # For sample2
                 {
                     'seq3': Classification(
                         'seq3', ClassificationType.GOOD, 'test reason', 'sample2',
-                        ['seq3'], DecisionCategory.SINGLE_SEQUENCE, 150
+                        ['seq3'], DecisionCategory.SINGLE_SEQUENCE,
+                        {'reads': 150, 'rank': 2}
                     )
                 }
             ]
 
-            # Call find_duplicates
+            # Call find_duplicates with updated parameters
             result = find_duplicates(
-                sample_to_seqs, ['seq1', 'seq2', 'seq3'], mock_dependencies['dist_matrix'],
-                mock_dependencies['contig_to_reads'], 0.02, 0.05, mock_dependencies['tree']
+                sample_to_seqs, ['seq1', 'seq2', 'seq3'],
+                mock_dependencies['dist_matrix'],
+                mock_dependencies['contigs_ranked'],
+                mock_dependencies['tree'],
+                segment="L",
+                thresholds=mock_dependencies['thresholds']
             )
 
         # Check results
@@ -423,8 +465,17 @@ class TestFindDuplicates:
         assert result['seq2'].is_bad
         assert result['seq3'].is_good
 
-        # Verify classify_sample was called twice (once per sample)
+        # Verify classify_sample was called correctly
         assert mock_classify.call_count == 2
+        # Check that mock_classify was called with the correct parameters
+        mock_classify.assert_any_call(
+            'sample1', ['seq1', 'seq2'],
+            mock_dependencies['tips_lookup'],
+            mock_dependencies['dist_matrix'],
+            mock_dependencies['contigs_ranked'],
+            mock_dependencies['tree'],
+            "L", mock_dependencies['thresholds']
+        )
 
     def test_empty_input(self, setup_find_duplicates):
         """Test with empty input."""
@@ -433,7 +484,8 @@ class TestFindDuplicates:
         # Empty sample_to_seqs
         result = find_duplicates(
             {}, data['tips'], data['dist_matrix'],
-            data['contig_to_reads'], 0.02, 0.05, data['tree']
+            data['contigs_ranked'], data['tree'],
+            segment="L", thresholds=data['thresholds']
         )
         assert result == {}
 
@@ -454,50 +506,35 @@ class TestFindDuplicates:
             mock_classify.side_effect = [
                 {'seqA': Classification(
                     'seqA', ClassificationType.GOOD, 'Single sequence',
-                    'sample1', ['seqA'], DecisionCategory.SINGLE_SEQUENCE, 100
+                    'sample1', ['seqA'], DecisionCategory.SINGLE_SEQUENCE,
+                    {'reads': 100, 'rank': 3}
                 )},
                 {'seqB': Classification(
                     'seqB', ClassificationType.GOOD, 'Single sequence',
-                    'sample2', ['seqB'], DecisionCategory.SINGLE_SEQUENCE, 200
+                    'sample2', ['seqB'], DecisionCategory.SINGLE_SEQUENCE,
+                    {'reads': 200, 'rank': 1}
                 )},
                 {'seqC': Classification(
                     'seqC', ClassificationType.GOOD, 'Single sequence',
-                    'sample3', ['seqC'], DecisionCategory.SINGLE_SEQUENCE, 150
+                    'sample3', ['seqC'], DecisionCategory.SINGLE_SEQUENCE,
+                    {'reads': 150, 'rank': 2}
                 )},
                 {'seqD': Classification(
                     'seqD', ClassificationType.GOOD, 'Single sequence',
-                    'sample4', ['seqD'], DecisionCategory.SINGLE_SEQUENCE, 300
+                    'sample4', ['seqD'], DecisionCategory.SINGLE_SEQUENCE,
+                    {'reads': 300, 'rank': 4}
                 )}
             ]
 
             result = find_duplicates(
                 sample_to_seqs, data['tips'], data['dist_matrix'],
-                data['contig_to_reads'], 0.02, 0.05, data['tree']
+                data['contigs_ranked'], data['tree'],
+                segment="L", thresholds=data['thresholds']
             )
 
         assert len(result) == 4
         assert all(result[seq].is_good for seq in data['tips'])
         assert all(result[seq].decision_category == DecisionCategory.SINGLE_SEQUENCE for seq in data['tips'])
-
-    def test_integration_with_classify_sample(self, setup_find_duplicates):
-        """Test integration between find_duplicates and classify_sample."""
-        data = setup_find_duplicates
-
-        # Create a sample with seqA and seqB (which are below lower threshold)
-        sample_to_seqs = {'sample1': ['seqA', 'seqB']}
-
-        # Don't mock classify_sample to test actual integration
-        result = find_duplicates(
-            sample_to_seqs, data['tips'], data['dist_matrix'],
-            data['contig_to_reads'], 0.02, 0.05, data['tree']
-        )
-
-        # Check results - should classify seqB as good (has more reads) and seqA as bad
-        assert len(result) == 2
-        assert result['seqA'].is_bad
-        assert result['seqB'].is_good
-        assert result['seqB'].decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
-        assert result['seqA'].decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
 
 
 class TestClassifySample:
@@ -521,22 +558,30 @@ class TestClassifySample:
             'seq4': 3, 'seq5': 4, 'seq6': 5
         }
 
-        contig_to_reads = {
-            'seq1': {'reads': 100},
-            'seq2': {'reads': 200},
-            'seq3': {'reads': 150},
-            'seq4': {'reads': 300},
-            'seq5': {'reads': 250},
-            'seq6': {'reads': 350}
+        contigs_ranked = {
+            'seq1': {'reads': 100, 'coverage': 95.0, 'rank': 4},
+            'seq2': {'reads': 200, 'coverage': 98.0, 'rank': 1},
+            'seq3': {'reads': 150, 'coverage': 96.0, 'rank': 3},
+            'seq4': {'reads': 300, 'coverage': 97.0, 'rank': 2},
+            'seq5': {'reads': 250, 'coverage': 94.0, 'rank': 5},
+            'seq6': {'reads': 350, 'coverage': 99.0, 'rank': 6}
         }
 
         mock_tree = MagicMock()
 
+        thresholds = {
+            "lower": 0.02,
+            "upper": 0.05,
+            "clade_size": 5,
+            "z_threshold": 3.0
+        }
+
         return {
             'dist_matrix': dist_matrix,
             'tips_lookup': tips_lookup,
-            'contig_to_reads': contig_to_reads,
-            'tree': mock_tree
+            'contigs_ranked': contigs_ranked,
+            'tree': mock_tree,
+            'thresholds': thresholds
         }
 
     def test_classify_sample_single_sequence(self, mock_dependencies):
@@ -547,8 +592,10 @@ class TestClassifySample:
             ['seq1'],
             mock_dependencies['tips_lookup'],
             mock_dependencies['dist_matrix'],
-            mock_dependencies['contig_to_reads'],
-            0.02, 0.05, mock_dependencies['tree']
+            mock_dependencies['contigs_ranked'],
+            mock_dependencies['tree'],
+            segment="L",
+            thresholds=mock_dependencies['thresholds']
         )
 
         # Check result
@@ -569,8 +616,10 @@ class TestClassifySample:
                 ['seq1', 'seq2'],
                 mock_dependencies['tips_lookup'],
                 mock_dependencies['dist_matrix'],
-                mock_dependencies['contig_to_reads'],
-                0.02, 0.05, mock_dependencies['tree']
+                mock_dependencies['contigs_ranked'],
+                mock_dependencies['tree'],
+                segment="L",
+                thresholds=mock_dependencies['thresholds']
             )
 
         # Should classify seq2 as good (highest reads) and seq1 as bad
@@ -597,8 +646,10 @@ class TestClassifySample:
                     ['seq1', 'seq2'],
                     mock_dependencies['tips_lookup'],
                     mock_dependencies['dist_matrix'],
-                    mock_dependencies['contig_to_reads'],
-                    0.02, 0.05, None  # Don't need tree for this path
+                    mock_dependencies['contigs_ranked'],
+                    mock_dependencies['tree'],
+                    segment="L",
+                    thresholds=mock_dependencies['thresholds']
                 )
 
         # Should classify each sequence as coinfection (as each is their own cluster)
@@ -640,10 +691,10 @@ class TestClassifySample:
                 test_sequences,
                 data['tips_lookup'],
                 test_dist_matrix,  # Use our customized distance matrix
-                data['contig_to_reads'],
-                0.02,
-                0.05,
-                None,
+                data['contigs_ranked'],
+                data['tree'],
+                segment="L",
+                thresholds=data['thresholds']
             )
 
         # Should identify as potential intrahost variants
@@ -692,9 +743,10 @@ class TestClassifySample:
                         ['seq1', 'seq2', 'seq3', 'seq4'],
                         data['tips_lookup'],
                         data['dist_matrix'],
-                        data['contig_to_reads'],
-                        0.02, 0.05, data['tree'],
-                        min_clade_size=5
+                        data['contigs_ranked'],
+                        data['tree'],
+                        segment="L",
+                        thresholds=data['thresholds']
                     )
 
                     print(result)
@@ -705,7 +757,7 @@ class TestClassifySample:
 
         # Should select sequence with highest read count among non-outliers as GOOD
         non_outliers = ['seq1', 'seq2', 'seq3']
-        best_seq = max(non_outliers, key=lambda seq: data['contig_to_reads'][seq]['reads'])
+        best_seq = max(non_outliers, key=lambda seq: data['contigs_ranked'][seq]['reads'])
         assert result[best_seq].is_good
         assert result[best_seq].decision_category == DecisionCategory.OUTLIERS_DETECTED
 
@@ -734,9 +786,10 @@ class TestClassifySample:
                     ['seq1', 'seq2', 'seq4'],
                     data['tips_lookup'],
                     data['dist_matrix'],
-                    data['contig_to_reads'],
-                    0.02, 0.09, data['tree'],
-                    min_clade_size=5
+                    data['contigs_ranked'],
+                    data['tree'],
+                    segment="L",
+                    thresholds=data['thresholds']
                 )
 
         # All sequences should be marked as coinfection
@@ -768,9 +821,10 @@ class TestClassifySample:
                     ['seq1', 'seq2', 'seq4'],
                     data['tips_lookup'],
                     data['dist_matrix'],
-                    data['contig_to_reads'],
-                    0.02, 0.05, data['tree'],
-                    min_clade_size=5
+                    data['contigs_ranked'],
+                    data['tree'],
+                    segment="L",
+                    thresholds=data['thresholds']
                 )
 
         # All sequences should be marked as coinfection
@@ -790,9 +844,10 @@ class TestClassifySample:
                 ['seq1', 'seq2', 'seq4'],  # These have distances above thresholds between them
                 data['tips_lookup'],
                 data['dist_matrix'],
-                data['contig_to_reads'],
-                0.02, 0.05, data['tree'],
-                min_clade_size=5  # Clade size (3) is below this
+                data['contigs_ranked'],
+                data['tree'],
+                segment="L",
+                thresholds=data['thresholds']
             )
 
         # Should select seq4 as good (highest read count) and mark others as bad
