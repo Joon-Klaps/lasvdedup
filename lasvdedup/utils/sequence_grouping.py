@@ -2,6 +2,7 @@ import re
 import logging
 from typing import Dict, List
 import numpy as np
+import Bio.Phylo
 from .classification import Classification, ClassificationType, DecisionCategory
 
 from .distance_matrix import get_distances, get_outliers
@@ -51,48 +52,40 @@ def is_all_distances_below_threshold(distances, threshold):
     """Check if all pairwise distances are below a given threshold."""
     return all(d <= threshold for d in distances)
 
-def select_best_sequence(seq_names, reads):
-    """Select the sequence with the highest read count."""
-    if not seq_names:
-        raise ValueError("Empty sequence list provided")
-
-    # Check if all sequences have read counts
-    missing_seqs = [seq for seq in seq_names if seq not in reads]
-    if missing_seqs:
-        raise KeyError(f"Missing read counts for sequences: {', '.join(missing_seqs)}")
-
-    # Check if all read counts are numeric
-    non_numeric = [seq for seq in seq_names if not isinstance(reads[seq], (int, float))]
-    if non_numeric:
-        raise TypeError(f"Non-numeric read counts for sequences: {', '.join(non_numeric)}")
-
-    return max(seq_names, key=lambda seq: reads[seq])
-
-def get_reads (seq_name: str, contig_to_reads: Dict[str, Dict[str, int]]) -> int:
+def get_contig_data(seq_name: str, contigs_ranked: Dict[str, Dict[str, float]]) -> Dict[str, float]:
     """
-    Get the number of reads for a given sequence.
+    Get the data (reads, coverage, qlen) for a given sequence.
 
     Args:
         seq_name: Sequence name
-        contig_to_reads: Dictionary mapping contig IDs to read counts
+        contigs_ranked: Dictionary mapping contig IDs to data values
     """
     # Try exact match first
-    if seq_name in contig_to_reads:
-        return contig_to_reads[seq_name]["reads"]
+    if seq_name in contigs_ranked:
+        return contigs_ranked[seq_name]
 
     # Try with _R_ replacement and splitting at first dot
     base_name = seq_name.replace('_R_', '').split(".", 1)[0]
-    if base_name in contig_to_reads:
-        return contig_to_reads[base_name]["reads"]
+    if base_name in contigs_ranked:
+        return contigs_ranked[base_name]
 
     # Try with just the part before any dots (for cases like seq.with.dots.extra)
-    for key in contig_to_reads.keys():
+    for key in contigs_ranked.keys():
         # Check if the key is a prefix of seq_name or matches before any dots
         if seq_name.startswith(key) and (len(seq_name) == len(key) or seq_name[len(key)] == '.'):
-            return contig_to_reads[key]["reads"]
+            return contigs_ranked[key]
 
-    logger.warning(f"Read count not found for sequence: {seq_name}")
-    raise ValueError(f"Read count not found for sequence: {seq_name}")
+    logger.warning(f"Data not found for sequence: {seq_name}")
+    raise ValueError(f"Data not found for sequence: {seq_name}")
+
+def select_best_sequence(seq_names, seq_data):
+    """
+    Select the best sequence based on previously identified rank
+    """
+    if not seq_names:
+        raise ValueError("Empty sequence list provided")
+
+    return min(seq_names, key=lambda seq: seq_data[seq]["rank"])
 
 def cluster_sequences(seq_names, tips_lookup, dist_matrix, threshold):
     """
@@ -129,12 +122,10 @@ def find_duplicates(
     sample_to_seqs: Dict[str, List[str]],
     tips: List,
     dist_matrix: np.ndarray,
-    contig_to_reads: Dict[str, Dict[str, int]],
-    lowerthreshold: float,
-    upperthreshold: float,
-    tree=None,
-    clade_size: int = 10,
-    z_threshold: float = 2.0
+    contigs_ranked: Dict[str, Dict[str, float]],
+    tree: Bio.Phylo = None,
+    segment: str = None,
+    thresholds: Dict[str, float] = None
 ) -> Dict[str, Classification]:
     """
     Process each sample group to identify duplicates based on phylogenetic distances.
@@ -143,18 +134,18 @@ def find_duplicates(
         sample_to_seqs: Dictionary mapping sample IDs to lists of sequence names
         tips: List of tree tips (sequence names)
         dist_matrix: Distance matrix as numpy array
-        contig_to_reads: Dictionary mapping contig IDs to read counts
+        contigs_ranked: Dictionary mapping contig IDs to read counts
         lowerthreshold: Minimum distance to identify duplicates
         upperthreshold: Maximum distance for intrahost variation
         tree: Bio.phylo tree object for MRCA analysis
         clade_size: Minimum clade size to consider a coinfection
         z_threshold: Z-score threshold for outlier detection
+        segment: Segment name (L or S) to determine target length
 
     Returns:
         Dictionary mapping each tip name to its Classification object
     """
-    logger.info("Finding duplicates with thresholds: lower=%.4f, upper=%.4f, clade_size=%d, z_threshold=%.2f",
-               lowerthreshold, upperthreshold, clade_size, z_threshold)
+    logger.info("Finding duplicates with thresholds: %s", thresholds)
 
     # Create lookup for efficient index retrieval
     tips_lookup = {t: i for i, t in enumerate(tips)}
@@ -173,10 +164,10 @@ def find_duplicates(
         logger.debug("Processing sample %d/%d: %s with %d sequences",
                 i+1, total_samples, sample_id, len(seq_names))
 
-        # Classify sequences in this sample
+        # Classify sequences in this sample - pass segment parameter
         sample_classifications = classify_sample(
             sample_id, seq_names, tips_lookup, dist_matrix,
-            contig_to_reads, lowerthreshold, upperthreshold, tree, clade_size, z_threshold
+            contigs_ranked, tree, segment, thresholds
         )
 
         # Update statistics
@@ -196,31 +187,20 @@ def find_duplicates(
     return all_classifications
 
 def classify_sample(
-    sample_id,
-    seq_names,
-    tips_lookup,
-    dist_matrix,
-    contig_to_reads,
-    lowerthreshold,
-    upperthreshold,
-    tree=None,
-    min_clade_size=10,
-    z_threshold=2.0
+    sample_id: str,
+    seq_names: List[str],
+    tips_lookup: Dict[str, int],
+    dist_matrix: np.ndarray,
+    contigs_ranked: Dict[str, Dict[str, float]],
+    tree: Bio.phylo = None,
+    segment: str = None,
+    thresholds: Dict[str, float] = None
 ):
     """
     Classify sequences from a single sample based on phylogenetic distances.
 
     Args:
-        sample_id: Sample identifier
-        seq_names: List of sequence names from this sample
-        tips_lookup: Dictionary mapping sequence names to matrix indices
-        dist_matrix: Distance matrix as numpy array
-        contig_to_reads: Dictionary mapping sequence names to read counts
-        lowerthreshold: Lower distance threshold for duplicates
-        upperthreshold: Upper distance threshold for intrahost variants
-        tree: Bio.Phylo tree object for MRCA analysis
-        min_clade_size: Minimum clade size to consider a coinfection
-        z_threshold: Z-score threshold for outlier detection
+
 
     Returns:
         Dictionary mapping sequence names to Classification objects
@@ -239,73 +219,73 @@ def classify_sample(
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.SINGLE_SEQUENCE,  # Set decision category
-                read_count=get_reads(seq, contig_to_reads) if contig_to_reads else None
+                contig_stats=contigs_ranked[seq]
             )
         return classifications
 
     # Get pairwise distances and read counts
     distances = get_distances(seq_names, tips_lookup, dist_matrix)
-    reads = {seq: get_reads(seq, contig_to_reads) for seq in seq_names}
+    stats = {seq: get_contig_data(seq, contigs_ranked) for seq in seq_names}
 
     # Case 1: All distances below lower threshold (simple duplicates)
-    if is_all_distances_below_threshold(distances, lowerthreshold):
+    if is_all_distances_below_threshold(distances, thresholds["lower"]):
         logger.debug("Sample %s: All sequences are similar (below lower threshold)", sample_id)
-        best_seq = select_best_sequence(seq_names, reads)
+        best_seq = select_best_sequence(seq_names, stats, segment)
 
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
-            reason=f"Selected as best representative (highest read count: {reads[best_seq]}) from nearly identical sequences (distances < {lowerthreshold})",
+            reason=f"Selected as best representative (contig stats: {stats[best_seq]}) from nearly identical sequences (distances < {thresholds['lower']})",
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,  # Set decision category
-            read_count=reads[best_seq]
+            contig_stats=stats[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
             classifications[seq] = Classification(
                 sequence_name=seq,
                 classification_type=ClassificationType.BAD,
-                reason=f"Duplicate of {best_seq} (distance < {lowerthreshold}, lower read count ({reads[seq]}) than {best_seq} ({reads[best_seq]}))",
+                reason=f"Duplicate of {best_seq} (distance < {thresholds['lower']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,  # Set decision category
-                read_count=reads[seq]
+                contig_stats=stats[seq]
             )
 
         return classifications
 
     # Case 2: All distances below upper threshold (potential intrahost variants)
-    if is_all_distances_below_threshold(distances, upperthreshold):
+    if is_all_distances_below_threshold(distances, thresholds["upper"]):
         logger.debug("Sample %s: Potential intrahost variants (below upper threshold)", sample_id)
 
         # Group sequences into clusters based on lower threshold
-        clusters = cluster_sequences(seq_names, tips_lookup, dist_matrix, lowerthreshold)
+        clusters = cluster_sequences(seq_names, tips_lookup, dist_matrix, thresholds["lower"])
 
-        # For each cluster, keep the sequence with highest read count
+        # For each cluster, keep the sequence with highest contig stats
         for cluster in clusters:
-            cluster_reads = {seq: reads[seq] for seq in cluster}
-            best_seq = select_best_sequence(cluster, cluster_reads)
+            cluster_stats = {seq: stats[seq] for seq in cluster}
+            best_seq = select_best_sequence(cluster, cluster_stats, segment)
 
             classifications[best_seq] = Classification(
                 sequence_name=best_seq,
                 classification_type=ClassificationType.COINFECTION,
-                reason=f"Intrahost variant (distances < {upperthreshold}), selected as cluster representative (highest read count: {reads[best_seq]})",
+                reason=f"Intrahost variant (distances < {thresholds['upper']}), selected as cluster representative (highest contig stats: {stats[best_seq]})",
                 sample_id=sample_id,
                 group_members=cluster,
                 decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,  # Set decision category
-                read_count=reads[best_seq]
+                contig_stats=stats[best_seq]
             )
 
             for seq in set(cluster) - {best_seq}:
                 classifications[seq] = Classification(
                     sequence_name=seq,
                     classification_type=ClassificationType.BAD,
-                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {lowerthreshold}, lower read count ({reads[seq]}) than {best_seq})",
+                    reason=f"Intrahost variant duplicate of {best_seq} (distance < {thresholds['lower']}, lower contig stats ({stats[seq]}) than {stats[best_seq]})",
                     sample_id=sample_id,
                     group_members=cluster,
                     decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,  # Set decision category
-                    read_count=reads[seq]
+                    contig_stats=stats[seq]
                 )
 
         return classifications
@@ -324,7 +304,7 @@ def classify_sample(
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.NO_TREE,  # Set decision category
-                read_count=reads[seq]
+                contig_stats=reads[seq]
             )
         return classifications
 
@@ -336,7 +316,7 @@ def classify_sample(
     if clade_size <= min_clade_size:
         logger.debug("Sample %s: Small MRCA clade size (%d) - likely false positive", sample_id, clade_size)
 
-        best_seq = select_best_sequence(seq_names, reads)
+        best_seq = select_best_sequence(seq_names, contigs_ranked, segment)
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
@@ -344,7 +324,7 @@ def classify_sample(
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
-            read_count=reads[best_seq]
+            contig_stats=reads[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
@@ -355,7 +335,7 @@ def classify_sample(
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.SMALL_CLADE,  # Set decision category
-                read_count=reads[seq]
+                contig_stats=reads[seq]
             )
 
         return classifications
@@ -373,7 +353,7 @@ def classify_sample(
         if not good_seqs:
             logger.error("No good sequences found after removing outliers: %s", outlier_names)
 
-        best_seq = select_best_sequence(good_seqs, reads)
+        best_seq = select_best_sequence(good_seqs, contigs_ranked, segment)
 
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
@@ -382,7 +362,7 @@ def classify_sample(
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.OUTLIERS_DETECTED,
-            read_count=reads[best_seq]
+            contig_stats=reads[best_seq]
         )
 
         for seq in set(seq_names) - {best_seq}:
@@ -395,7 +375,7 @@ def classify_sample(
                     sample_id=sample_id,
                     group_members=group_members,
                     decision_category=DecisionCategory.OUTLIERS_DETECTED,
-                    read_count=reads[seq]
+                    contig_stats=reads[seq]
                 )
             else:
                 classifications[seq] = Classification(
@@ -405,7 +385,7 @@ def classify_sample(
                     sample_id=sample_id,
                     group_members=group_members,
                     decision_category=DecisionCategory.OUTLIERS_DETECTED,
-                    read_count=reads[seq]
+                    contig_stats=reads[seq]
                 )
 
         return classifications
@@ -421,7 +401,7 @@ def classify_sample(
             sample_id=sample_id,
             group_members=group_members,
             decision_category=DecisionCategory.TRUE_COINFECTION,  # Set decision category
-            read_count=reads[seq]
+            contig_stats=reads[seq]
         )
 
     return classifications

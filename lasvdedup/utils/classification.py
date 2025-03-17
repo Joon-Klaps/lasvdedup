@@ -33,10 +33,7 @@ class Classification:
     sample_id: str
     group_members: List[str]
     decision_category: DecisionCategory
-
-    # Optional fields
-    read_count: Optional[int] = None
-    extra_data: Dict[str, Any] = None
+    contig_stats: Dict[str, float]
 
     @classmethod
     def from_dict(cls, seq_name: str, data: Dict) -> 'Classification':
@@ -64,8 +61,7 @@ class Classification:
             reason=data.get("reason", "No reason provided"),
             sample_id=data.get("sample_id", "Unknown"),
             group_members=data.get("group_members", []),
-            read_count=data.get("read_count"),
-            extra_data=data.get("extra_data", {}),
+            contig_stats=data.get("contig_stats"),
             decision_category=data.get("decision_category", "")
         )
 
@@ -79,16 +75,10 @@ class Classification:
             "classification": self.classification_type.value,
             "reason": self.reason,
             "sample_id": self.sample_id,
-            "group_members": self.group_members
+            "group_members": self.group_members,
+            "decision_category": self.decision_category,
+            "contig_stats": self.contig_stats
         }
-
-        # Add optional fields if present
-        if self.read_count is not None:
-            result["read_count"] = self.read_count
-
-        if self.extra_data:
-            result.update(self.extra_data)
-
         return result
 
     def to_line(self, delimiter: str = "\t") -> str:
@@ -106,7 +96,7 @@ class Classification:
             self.sequence_name,
             self.classification_type.value,
             self.decision_category.value,
-            str(self.read_count) or "NA",
+            str(self.contig_stats) or "NA",
             self.sample_id,
             str(self.group_members),
             self.reason
@@ -145,7 +135,7 @@ class Classification:
             Header line string
         """
         fields = ["sequence_name", "classification", "decision_category",
-                "sample_id", "read_count", "group_members", "reason",]
+                "sample_id", "contig_stats", "group_members", "reason",]
         return delimiter.join(fields)
 
     @staticmethod

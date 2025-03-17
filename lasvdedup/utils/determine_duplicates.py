@@ -9,7 +9,7 @@ import yaml
 # Import sub utility functions
 from .tree_utils import root_tree_at_midpoint
 from .distance_matrix import to_distance_matrix
-from .io_utils import load_read_counts, write_results, write_distance_matrix
+from .io_utils import sort_table, write_results, write_distance_matrix
 from .sequence_grouping import group_sequences_by_sample, find_duplicates
 
 # Set up logging
@@ -31,113 +31,41 @@ def setup_logging(level=logging.INFO, filepath=None):
         fileHandler.setFormatter(formatter)
         logger.addHandler(fileHandler)
 
-def get_segment_thresholds(config, segment):
-    """
-    Get the appropriate thresholds for the given segment.
-
-    Args:
-        config: Configuration dictionary or segment name
-        segment: Segment name (e.g. 'L', 'S')
-
-    Returns:
-        tuple: (lower_threshold, upper_threshold, clade_size, z_threshold)
-    """
-    # If config is a dictionary, extract thresholds from it
-    logger.debug("Getting segment thresholds for %s", segment)
-    logger.debug("Config: %s", config)
-
-    if isinstance(config, dict):
-        thresholds = config.get('DEDUPLICATE', {}).get('THRESHOLDS', {})
-        segment_thresholds = thresholds.get(segment, None)
-
-        if segment_thresholds:
-            return (
-                float(segment_thresholds.get('LOWER')),
-                float(segment_thresholds.get('UPPER')),
-                int(segment_thresholds.get('CLADE_SIZE', 8)),
-                float(segment_thresholds.get('Z_THRESHOLD', 2.0))
-            )
-
-        # Use default thresholds if segment-specific ones aren't defined
-        default = config.get('DEDUPLICATE', {}).get('DEFAULT_THRESHOLD', {})
-        return (
-            float(default.get('LOWER', config.get('lowerthreshold', 0.01))),
-            float(default.get('UPPER', config.get('upperthreshold', 0.02))),
-            int(default.get('CLADE_SIZE', config.get('clade_size', 8))),
-            float(default.get('Z_THRESHOLD', config.get('z_threshold', 2.0)))
-        )
-
-    # If no config dictionary was provided, use the parameters directly
-    return (
-        float(config.get('lowerthreshold', 0.01)),
-        float(config.get('upperthreshold', 0.02)),
-        int(config.get('clade_size', 8)),
-        float(config.get('z_threshold', 2.0))
-    )
-
-def determine_duplicates(config=None, **kwargs):
+def determine_duplicates(config=None):
     """
     Main function to detect duplicate sequences in a phylogenetic tree.
 
     Args:
         config: Path to config file or config dictionary (optional)
-        **kwargs: Additional keyword arguments including:
-            tree: Path to the phylogenetic tree file
-            sequences: Path to the sequences file (FASTA format)
-            prefix: Output file prefix
-            table: Path to the table with contig information
-            sample_regex: Regular expression to extract sample identifiers
-            reads_column: Name of the column containing read counts
-            species: Species name for the output files
-            segment: Segment name for the output files
-            lowerthreshold: Lower distance threshold (if not using config)
-            upperthreshold: Upper distance threshold (if not using config)
-            log_level: Logging level
     """
-    # Load configuration if path is provided
-    if config and isinstance(config, str):
-        try:
-            with open(config, 'r') as f:
-                config_data = yaml.safe_load(f)
-        except Exception as e:
-            logger.warning(f"Failed to load config from {config}: {e}")
-            config_data = {}
-    elif config and isinstance(config, dict):
-        config_data = config
-    else:
-        config_data = {}
 
     # Create output directory if it doesn't exist
-    prefix = kwargs["prefix"]
-    prefix_path = os.path.abspath(prefix)
+    prefix = config["prefix"]
     os.makedirs(prefix, exist_ok=True)
 
     # Extract segment for threshold determination
-    segment = kwargs.get("segment", None)
-    species = kwargs.get("species") or config_data.get('SPECIES', 'LASV')
+    if (segment := config.get("segment")) is None:
+        raise ValueError("Segment not provided in config or CLI arguments")
+
+    if (species := config.get("species")) is None:
+        raise ValueError("Species not provided in config or CLI arguments")
 
     # Setup logging
-    log_level = kwargs.get("log_level", "INFO")
-    setup_logging(log_level, f"{prefix_path}/{species}-{segment}.log")
+    log_level = config.get("log_level", "INFO")
+    setup_logging(log_level, f"{prefix}/{species}-{segment}.log")
 
     # Log start of the process with parameters
     logger.info("Starting duplicate detection process")
 
-    # Extract segment for threshold determination
-    segment = kwargs.get("segment", None)
-    # Get ALL thresholds based on segment
-    lowerthreshold, upperthreshold, clade_size, z_threshold = get_segment_thresholds(
-        config_data if config_data else kwargs,
-        segment
-    )
+    if (thresholds := config.get("DEDUPLICATE", {}).get("THRESHOLDS", {}).get(segment)) is None:
+        logger.error(f"No thresholds found for segment {segment}")
 
-    logger.info("Using thresholds for segment %s: lower=%f, upper=%f, clade_size=%d, z_threshold=%f",
-                segment, lowerthreshold, upperthreshold, clade_size, z_threshold)
+    logger.info("Using thresholds for segment %s: %s", segment, thresholds)
 
     start_time = time.time()
 
     # Load and root the tree using the modular function
-    tree = root_tree_at_midpoint(kwargs["tree"])
+    tree = root_tree_at_midpoint(config["tree"])
 
     # Calculate distances from tree
     tips, dist_matrix = to_distance_matrix(tree["phylodm"])
@@ -145,27 +73,30 @@ def determine_duplicates(config=None, **kwargs):
     # Write distance matrix to file
     write_distance_matrix(dist_matrix, tips, f"{prefix}/distance_matrix.mldist")
 
-    # Load read counts from contigs table
-    reads_column = kwargs.get("reads_column") or config_data.get('DEDUPLICATE', {}).get('READS_COLUMN', 'reads')
-    contig_to_reads = load_read_counts(kwargs["table"], reads_column)
+    # Load read counts and coverage from contigs table
+    if (length_column  := config.get("length_colum")) is None:
+        logger.error("Length column not found in config or CLI arguments")
+    selection_columns = config.get("selection_column") or []
 
-    # Get sample regex from config or kwargs with a default pattern
-    sample_regex = kwargs.get("sample_regex") or config_data.get('DEDUPLICATE', {}).get('SAMPLE_REGEX', r'(LVE\d+)_.*')
+    # Create dictionary of all contigs with their rank {sample: {rank: x, ...}}
+    contigs_ranked = sort_table(config["table"], length_column,
+        selection_columns, expected_length = thresholds["target_length"])
+
+    sample_regex = config.get("sample_regex", r'(LVE\d+)_.*')
 
     # Group sequences by sample
     sample_to_seqs = group_sequences_by_sample(tips, sample_regex)
 
-    # Find duplicates with the determined thresholds
+    # Find duplicates with the determined thresholds - pass segment parameter
     classifications = find_duplicates(
-        sample_to_seqs, tips, dist_matrix, contig_to_reads,
-        lowerthreshold, upperthreshold, tree["biophylo"],
-        clade_size=clade_size, z_threshold=z_threshold
-    )
+        sample_to_seqs, tips, dist_matrix, contigs_ranked,
+        tree["biophylo"], segment, thresholds
+        )
 
     # Write results to output files
-    logger.info("Loading sequences from %s", kwargs['sequences'])
-    seq_records = SeqIO.to_dict(SeqIO.parse(str(kwargs["sequences"]), "fasta"))
-    write_results(classifications, seq_records, species, segment, prefix_path, sample_regex)
+    logger.info("Loading sequences from %s", config['sequences'])
+    seq_records = SeqIO.to_dict(SeqIO.parse(str(config["sequences"]), "fasta"))
+    write_results(classifications, seq_records, species, segment, prefix, sample_regex)
 
     # Log completion time
     elapsed = time.time() - start_time

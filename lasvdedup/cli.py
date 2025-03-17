@@ -2,13 +2,16 @@
 """Command-line interface for LASV deduplication pipeline."""
 
 import argparse
-import os
 import sys
+import logging
 from pathlib import Path
-import yaml
-from .utils.resources import get_config_path
+
 from .utils.determine_duplicates import determine_duplicates
+from .utils.config_setup import build_config
 from .pipeline import run_pipeline
+
+# Set up logger
+logger = logging.getLogger("lasvdedup.cli")
 
 def parse_args():
     """Parse command-line arguments."""
@@ -24,7 +27,7 @@ def parse_args():
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 
     # Main pipeline command
-    run_parser = subparsers.add_parser('run', help='Run the full pipeline')
+    run_parser = subparsers.add_subparser('run', help='Run the full pipeline')
 
     # Required arguments for the run command
     run_parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True,
@@ -43,7 +46,7 @@ def parse_args():
     run_parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
 
     # Deduplicate command
-    dedup_parser = subparsers.add_parser('deduplicate', help='Run just the deduplication step')
+    dedup_parser = subparsers.add_subparser('deduplicate', help='Run just the deduplication step')
 
     # Required arguments for the deduplicate command
     dedup_parser.add_argument('--tree', '-t', required=True, type=Path,
@@ -56,14 +59,14 @@ def parse_args():
                        help='Output directory prefix')
 
     # Optional arguments for the deduplicate command
-    dedup_parser.add_argument('--sample-regex', '-r', type=str, default=r'sample\d+',
+    dedup_parser.add_argument('--sample-regex', '-r', type=str,
                        help='Regular expression to extract sample identifiers')
-    dedup_parser.add_argument('--reads-column', type=str, default='reads',
-                       help='Name of the column containing read counts')
-    dedup_parser.add_argument('--species', type=str, default='LASV',
-                       help='Species name for output files')
-    dedup_parser.add_argument('--segment', type=str, default='L',
-                       help='Segment name for output files')
+    dedup_parser.add_argument('--length-column', type=str,
+                       help='Name of the column containing consensus length')
+    dedup_parser.add_argument('--species', type=str,
+                           help='Species name for output files')
+    dedup_parser.add_argument('--segment', type=str,
+                           help='Segment name for output files')
     dedup_parser.add_argument('--lowerthreshold', type=float,
                        help='Override distance threshold to identify duplicates')
     dedup_parser.add_argument('--upperthreshold', type=float,
@@ -88,74 +91,15 @@ def parse_args():
 
     return args
 
-def build_config(args):
-    """
-    Build a complete configuration dictionary from CLI args and config file.
-
-    Args:
-        args: Parsed command-line arguments
-
-    Returns:
-        dict: Complete configuration dictionary
-    """
-    # Determine config file path
-    config_path = args.config or get_config_path()
-
-    # Ensure config file exists
-    if not os.path.isfile(config_path):
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    # Load config from file
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-
-    # Update paths to absolute paths
-    contigs_table = os.path.abspath(args.contigs_table)
-    if not os.path.isfile(contigs_table):
-        raise FileNotFoundError(f"Contigs table not found: {contigs_table}")
-
-    # Infer seq_data_dir if not provided
-    if not args.seq_data_dir:
-        seq_data_dir = os.path.dirname(contigs_table)
-        print(f"Sequence data directory not specified, using: {seq_data_dir}")
-    else:
-        seq_data_dir = os.path.abspath(args.seq_data_dir)
-
-    if not os.path.isdir(seq_data_dir):
-        raise FileNotFoundError(f"Sequence data directory not found: {seq_data_dir}")
-
-    # Override config with CLI arguments
-    cli_overrides = {
-        'CONTIGS_TABLE': contigs_table,
-        'SEQ_DATA_DIR': seq_data_dir,
-        'WORKDIR': os.path.abspath(args.workdir) if args.workdir else ".",
-    }
-
-    # Only override BASE_DATA_DIR if explicitly provided
-    if args.base_data_dir:
-        cli_overrides['BASE_DATA_DIR'] = args.base_data_dir
-    elif not config.get('BASE_DATA_DIR'):
-        # If no BASE_DATA_DIR in config either, don't set it
-        # It will fall back to the package data dir in the Snakefile
-        pass
-
-    if args.threads:
-        cli_overrides['THREADS'] = args.threads
-
-    if args.force:
-        cli_overrides['FORCE'] = True
-
-    if args.outdir:
-        cli_overrides['OUTDIR'] =  os.path.abspath(args.outdir)
-
-    # Update config with CLI overrides
-    config.update(cli_overrides)
-
-    return config
-
 def main():
     """Main entry point for the CLI."""
     args = parse_args()
+
+    # Setup basic logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level if hasattr(args, 'log_level') else 'WARNING'),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
     try:
         if args.command == 'run':
@@ -163,29 +107,15 @@ def main():
             config = build_config(args)
 
             # Run pipeline with complete config
-            success = run_pipeline(
-                config=config,
-                dry_run=args.dry_run
-            )
+            success = run_pipeline( config=config, dry_run=args.dry_run)
             sys.exit(0 if success else 1)
 
         elif args.command == 'deduplicate':
-            # Create config dict if no config file provided but thresholds specified
+            # Create config dict with proper priority order
             config = build_config(args)
 
             # Run determine_duplicates with config
-            determine_duplicates(
-                config=config,
-                tree=args.tree,
-                sequences=args.sequences,
-                prefix=args.prefix,
-                table=args.table,
-                sample_regex=args.sample_regex,
-                reads_column=args.reads_column,
-                species=args.species,
-                segment=args.segment,
-                log_level=args.log_level
-            )
+            determine_duplicates(config=config)
             print(f"Deduplication completed successfully. Results saved to: {args.prefix}")
             sys.exit(0)
 

@@ -12,44 +12,54 @@ from .classification import Classification
 
 logger = logging.getLogger("lasvdedup.duplicates")
 
-def load_read_counts(table_path: Path, reads_column:str) -> Dict[str, Dict[str, int]]:
+def sort_table(table_path: Path, length_column:str,
+            selection_columns:List[str] = None, expected_length=float) -> pd.DataFrame:
     """
-    Extract contig ID to read count mapping from contigs table.
+    Extract contig ID to read count, coverage, and sequence length mapping from contigs table.
 
     Args:
         table_path: Path to the contigs table
+        length_column: Name of the column containing length information
+        selection_columns: List of columns used for selection
+        expected_length: Target length to filter contigs
 
     Returns:
-        Dictionary mapping contig IDs to read counts
+        DataFrame with contig IDs as index, containing reads, coverage and qlen columns
     """
-    logger.info("Loading read counts from %s", table_path)
-    try:
-        contigs_df = pd.read_csv(str(table_path), sep="\t")
-        logger.info("Loaded table with %d rows and %d columns",
-                    len(contigs_df), len(contigs_df.columns))
+    logger.info("Loading read counts and coverage from %s", table_path)
 
-        if reads_column in contigs_df.columns:
-            logger.info("Using specified reads column: %s", reads_column)
-            contigs_df["reads"] = contigs_df[reads_column]
-        elif "(samtools Post-dedup) reads mapped (R1+R2)" in contigs_df.columns:
-            logger.info("Using '(samtools Post-dedup) reads mapped (R1+R2)' column")
-            contigs_df["reads"] = contigs_df["(samtools Post-dedup) reads mapped (R1+R2)"]
-        elif "(samtools Raw) reads mapped (R1+R2)" in contigs_df.columns:
-            logger.info("Using '(samtools Raw) reads mapped (R1+R2)' column")
-            contigs_df["reads"] = contigs_df["(samtools Raw) reads mapped (R1+R2)"]
-        else:
-            logger.error("Reads column %s not found in table", reads_column)
-            raise ValueError(f"Reads column {reads_column} not found in table: {table_path}")
+    contigs_df = pd.read_csv(str(table_path), sep="\t")
+    logger.info("Loaded table with %d rows and %d columns",
+                len(contigs_df), len(contigs_df.columns))
 
-        contigs_df.set_index("index", inplace=True)
-        contigs_df = contigs_df[["reads"]]
-        contig_to_reads = contigs_df.to_dict('index')
-        logger.info("Processed read counts for %d contigs", len(contig_to_reads))
-        return contig_to_reads
+    if length_column not in contigs_df.columns:
+        logger.error("Length column %s not found in table", length_column)
+        raise ValueError(f"Length column {length_column} not found in table: {table_path}")
 
-    except Exception as e:
-        logger.error("Error loading read counts: %s", e, exc_info=True)
-        raise
+    if any( badcolumns :=  col for col in selection_columns if col not in contigs_df.columns):
+        logger.error("Selection column %s not found in table: %s", badcolumns, table_path)
+        raise ValueError(f"Selection column {badcolumns} not found in table: {table_path}")
+
+    # Filter contigs by length
+    contigs_df["distance_to_expectation"] = abs(contigs_df[contigs_df[length_column] == expected_length])
+
+    # Filter contigs by selection columns
+    rank_columns= ["distance_to_expectation"] + selection_columns
+
+    # Set first column (distance) as ascending=True and all others as ascending=False
+    ascending_values = [True] + [False] * len(selection_columns)
+    contigs_ranked = contigs_df.sort_values(by=rank_columns, ascending=ascending_values)
+
+    # Have their order written to a column (ie rank)
+    contigs_ranked["rank"] = range(1, len(contigs_ranked) + 1)
+
+    logger.info("Sorted contigs by distance to expected length and selection columns")
+
+    contigs_ranked.set_index("index", inplace=True)
+
+    result_df = contigs_ranked[['rank'] + rank_columns]
+
+    return result_df.to_dict('index')
 
 def write_distance_matrix(dist_matrix: np.ndarray, labels: List, output_path: str) -> None:
     """Write distance matrix to a file."""

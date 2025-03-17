@@ -4,6 +4,7 @@ SEQ_DATA_DIR: ""   # Default empty, should be provided at runtime
 BASE_DATA_DIR: "https://raw.githubusercontent.com/Joon-Klaps/lasvdedup/refs/heads/main/lasvdedup/data/"
 OUTDIR: "lasvdedup-out"  # Default output directory
 WORKDIR: ".work"       # Working directory for Snakemake
+LOGLEVEL: "INFO"
 
 # Parallelization settings
 THREADS: 4        # Default threads for the whole pipeline
@@ -23,18 +24,23 @@ IQTREE:
 # Sequence analysis settings
 DEDUPLICATE:
   SAMPLE_REGEX: "LVE[0-9]{5}"
-  READS_COLUMN: "(samtools Post-dedup) reads mapped (R1+R2)"
+  LENGTH_COLUMN: "(annotation) qlen"
+  SELECTION_COLUMNS:
+    - "(samtools Post-dedup) reads mapped (R1+R2)"
+    - "(general_stats) mosdepth 10X coverage"
   THRESHOLDS:
     L:  # L segment
       LOWER: 0.01
       UPPER: 0.02
       CLADE_SIZE: 8
       Z_THRESHOLD: 2
+      TARGET_LENGTH: 7200
     S:  # S segment
       LOWER: 0.01
       UPPER: 0.02
       CLADE_SIZE: 8
       Z_THRESHOLD: 2.0
+      TARGET_LENGTH: 3400
 
   # Default thresholds for segments not explicitly defined
   DEFAULT_THRESHOLD:
@@ -42,3 +48,4 @@ DEDUPLICATE:
       UPPER: 0.02
       CLADE_SIZE: 8
       Z_THRESHOLD: 2.0
+      TARGET_LENGTH: 5000
