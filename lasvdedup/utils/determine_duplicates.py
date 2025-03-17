@@ -90,7 +90,7 @@ def determine_duplicates(
         raise ValueError("Species not provided in config or CLI arguments")
 
     # Setup logging
-    log_level = config.get("log_level", "INFO")
+    log_level = config.get("LOGLEVEL", "INFO")
     setup_logging(level=getattr(logging, log_level) if isinstance(log_level, str) else log_level,
                  filepath=str(prefix / f"{species}-{segment}.log"))
 
@@ -115,17 +115,17 @@ def determine_duplicates(
     write_distance_matrix(dist_matrix, tips, str(prefix / "distance_matrix.mldist"))
 
     # Load read counts and coverage from contigs table
-    if (length_column := config["DEDUPLICATE"]["LENGTH_COLUMN"]) is None:
+    if (length_column := config["LENGTH_COLUMN"]) is None:
         logger.error("LENGTH_COLUMN not found in config or CLI arguments")
-    if not (selection_columns := config["DEDUPLICATE"]["SELECTION_COLUMNS"] or []):
+    if not (selection_columns := config["SELECTION_COLUMNS"] or []):
         logger.warning("No selection columns found in config or CLI arguments")
 
     # Create dictionary of all contigs with their rank {sample: {rank: x, ...}}
-    contig_table = config["TABLE"]
+    contig_table = config["CONTIGS_TABLE"]
     contigs_ranked = sort_table(contig_table, length_column,
         selection_columns, expected_length=thresholds["TARGET_LENGTH"])
 
-    sample_regex = config["DEDUPLICATE"]["SAMPLE_REGEX"] or r'(LVE\d+)_.*'
+    sample_regex = config["SAMPLE_REGEX"] or r'(LVE\d+)_.*'
 
     # Group sequences by sample
     sample_to_seqs = group_sequences_by_sample(tips, sample_regex)

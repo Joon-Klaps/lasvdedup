@@ -32,15 +32,21 @@ def sort_table(table_path: Path, length_column:str,
     logger.info("Loaded table with %d rows and %d columns",
                 len(contigs_df), len(contigs_df.columns))
 
-    # Check if all filtering columns are present in the table
-    if any( badcolumns :=  col for col in selection_columns + [length_column] if col not in contigs_df.columns):
-        logger.error("Selection column %s not found in table: %s", badcolumns, table_path)
-        raise ValueError(f"Selection column {badcolumns} not found in table: {table_path}")
+    # Ensure selection_columns is a list and not None
+    if selection_columns is None:
+        selection_columns = []
 
-    logger.info("Sorted contigs by distance to expected length and selection columns")
+    # Check if all filtering columns are present in the table
+    missing_columns = [col for col in selection_columns + [length_column] if col not in contigs_df.columns]
+    if missing_columns:
+        logger.error("Selection column(s) %s not found in table: %s", missing_columns, table_path)
+        raise ValueError(f"Selection column(s) {missing_columns} not found in table: {table_path}")
+
+    # Calculate distance to expected length
+    contigs_df["distance_to_expectation"] = abs(contigs_df[length_column] - expected_length)
 
     # Filter contigs by selection columns
-    rank_columns= ["distance_to_expectation"] + selection_columns
+    rank_columns = ["distance_to_expectation"] + selection_columns
 
     # Set first column (distance) as ascending=True and all others as ascending=False
     ascending_values = [True] + [False] * len(selection_columns)
@@ -51,9 +57,13 @@ def sort_table(table_path: Path, length_column:str,
 
     logger.info("Sorted contigs by distance to expected length and selection columns")
 
-    contigs_ranked.set_index("index", inplace=True)
+    # Make sure 'index' column exists before setting it as index
+    if 'index' in contigs_ranked.columns:
+        contigs_ranked.set_index("index", inplace=True)
 
-    result_df = contigs_ranked[['rank'] + rank_columns]
+    # Select columns for result, be careful not to select columns that don't exist
+    result_columns = ['rank'] + rank_columns
+    result_df = contigs_ranked[result_columns]
 
     return result_df.to_dict('index')
 

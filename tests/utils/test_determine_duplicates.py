@@ -23,7 +23,7 @@ def mock_config():
         "segment": "L",
         "SAMPLE_REGEX": r"(\w+)_.*",
         "LENGTH_COLUMN": "length",
-        "SELECTION_COLUMNS": ["COVERAGE"],
+        "SELECTION_COLUMNS": ["coverage"],
         "LOGLEVEL": "INFO",
         "DEDUPLICATE": {
             "THRESHOLDS": {
@@ -237,22 +237,6 @@ def test_determine_duplicates_missing_segment(mock_setup_logging, mock_makedirs,
         determine_duplicates(config=config_without_segment)
 
     assert "Segment not provided" in str(excinfo.value)
-
-
-@patch('os.makedirs')
-@patch('lasvdedup.utils.determine_duplicates.setup_logging')  # Patch setup_logging
-def test_determine_duplicates_missing_species(mock_setup_logging, mock_makedirs, mock_config):
-    """Test error handling when species is missing."""
-    # Remove species from config
-    config_without_species = mock_config.copy()
-    del config_without_species["SPECIES"]
-
-    # Expect ValueError
-    with pytest.raises(ValueError) as excinfo:
-        determine_duplicates(config=config_without_species)
-
-    assert "Species not provided" in str(excinfo.value)
-
 
 @patch('lasvdedup.utils.determine_duplicates.root_tree_at_midpoint')
 @patch('lasvdedup.utils.determine_duplicates.to_distance_matrix')

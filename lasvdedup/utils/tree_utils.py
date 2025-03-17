@@ -27,7 +27,7 @@ def root_tree_at_midpoint(tree_path: Path) -> PhyloDM:
 
     # Load the rooted tree with PhyloDM
     logger.info("Loading rooted tree into PhyloDM")
-    tree["PHLYODM"] = PhyloDM.load_from_newick_path(rooted_tree_path)
+    tree["PHYLODM"] = PhyloDM.load_from_newick_path(rooted_tree_path)
 
     # Clean up the temporary file
     try:
