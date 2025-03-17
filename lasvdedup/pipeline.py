@@ -34,17 +34,30 @@ def run_pipeline(config, dry_run=False):
     # Log the working directory being used
     logger.debug(f"Using working directory: {workdir}")
 
-    # Resolve relative paths in config for input files
-    for key in ["CONTIGS_TABLE", "SEQ_DATA_DIR", "BASE_DATA_DIR"]:
-        if key in config and config[key]:
-            if isinstance(config[key], (str, Path)) and not os.path.isabs(str(config[key])):
-                config[key] = os.path.abspath(str(config[key]))
-            logger.debug(f"Using {key}: {config[key]}")
+    # Make a copy of the config to avoid modifying the original
+    config_copy = config.copy()
+
+    # Resolve paths but preserve URLs
+    for key in ["CONTIGS_TABLE", "SEQ_DATA_DIR"]:
+        if key in config_copy and config_copy[key]:
+            if isinstance(config_copy[key], (str, Path)) and not os.path.isabs(str(config_copy[key])):
+                # Handle relative paths by making them absolute relative to workdir
+                config_copy[key] = os.path.join(workdir, str(config_copy[key]))
+            logger.debug(f"Using {key}: {config_copy[key]}")
+
+    # Special handling for BASE_DATA_DIR to preserve URLs
+    if "BASE_DATA_DIR" in config_copy and config_copy["BASE_DATA_DIR"]:
+        base_dir = str(config_copy["BASE_DATA_DIR"])
+        # Only convert to absolute path if it's not a URL
+        if not base_dir.startswith(("http://", "https://")):
+            if not os.path.isabs(base_dir):
+                config_copy["BASE_DATA_DIR"] = os.path.join(workdir, base_dir)
+        logger.debug(f"Using BASE_DATA_DIR: {config_copy['BASE_DATA_DIR']}")
 
     # Prepare snakemake arguments
     snakemake_args = {
         'snakefile': str(snakefile),
-        'config': config,
+        'config': config_copy,
         'cores': threads,
         'forceall': force,
         'dryrun': dry_run,
@@ -54,7 +67,7 @@ def run_pipeline(config, dry_run=False):
 
     try:
         # Run snakemake using the correct API
-        logger.debug(f"Running snakemake with config: {config}")
+        logger.debug(f"Running snakemake with config: {config_copy}")
         success = snakemake.snakemake(**snakemake_args)
         return success
     except Exception as e:

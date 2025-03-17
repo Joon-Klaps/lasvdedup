@@ -94,13 +94,16 @@ def test_config(test_workdir):
     # Set working directory to test directory
     config["WORKDIR"] = str(test_workdir)
 
-    # Ensure absolute paths for critical input files
+    # Set absolute paths to the test data files in temp directory
     config["CONTIGS_TABLE"] = str(test_workdir / "contigs-test.tsv")
     config["SEQ_DATA_DIR"] = str(test_workdir / "seq_data")
 
-    # Create a local base data dir instead of using the remote one for testing
-    config["BASE_DATA_DIR"] = str(test_workdir / "base_data")
+    # Make sure BASE_DATA_DIR is correctly set
+    # If it's a URL, leave it as is, otherwise set to the local base_data directory
+    if not config["BASE_DATA_DIR"].startswith(("http://", "https://")):
+        config["BASE_DATA_DIR"] = str(test_workdir / "base_data")
 
+    logger.debug(f"Test configuration: {config}")
     return config
 
 def test_full_workflow(setup_test_data, test_config):
