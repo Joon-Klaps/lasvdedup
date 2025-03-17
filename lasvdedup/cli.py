@@ -27,7 +27,7 @@ def parse_args():
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 
     # Main pipeline command
-    run_parser = subparsers.add_subparser('run', help='Run the full pipeline')
+    run_parser = subparsers.add_parser('run', help='Run the full pipeline')
 
     # Required arguments for the run command
     run_parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True,
@@ -46,7 +46,7 @@ def parse_args():
     run_parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
 
     # Deduplicate command
-    dedup_parser = subparsers.add_subparser('deduplicate', help='Run just the deduplication step')
+    dedup_parser = subparsers.add_parser('deduplicate', help='Run just the deduplication step')
 
     # Required arguments for the deduplicate command
     dedup_parser.add_argument('--tree', '-t', required=True, type=Path,
