@@ -137,7 +137,7 @@ def find_duplicates(
         contigs_ranked: Dictionary mapping contig IDs to read counts
         lowerthreshold: Minimum distance to identify duplicates
         upperthreshold: Maximum distance for intrahost variation
-        tree: Bio.phylo tree object for MRCA analysis
+        tree: Bio.Phylo tree object for MRCA analysis
         clade_size: Minimum clade size to consider a coinfection
         z_threshold: Z-score threshold for outlier detection
         segment: Segment name (L or S) to determine target length
@@ -192,7 +192,7 @@ def classify_sample(
     tips_lookup: Dict[str, int],
     dist_matrix: np.ndarray,
     contigs_ranked: Dict[str, Dict[str, float]],
-    tree: Bio.phylo = None,
+    tree: Bio.Phylo = None,
     segment: str = None,
     thresholds: Dict[str, float] = None
 ):
