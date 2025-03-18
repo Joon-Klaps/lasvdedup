@@ -112,7 +112,6 @@ def determine_duplicates(
     # Write distance matrix to file
     write_distance_matrix(dist_matrix, tips, str(prefix / "distance_matrix.mldist"))
 
-    # Load read counts and coverage from contigs table
     if (length_column := config.get("LENGTH_COLUMN") or config.get("DEDUPLICATE", {}).get("LENGTH_COLUMN")) is None:
         logger.error("LENGTH_COLUMN not found in config or CLI arguments")
     if not (selection_columns := config.get("DEDUPLICATE", {}).get("SELECTION_COLUMNS") or config.get("SELECTION_COLUMNS", [])):

@@ -65,13 +65,17 @@ def parse_args():
     dedup_parser.add_argument('--length-column', type=str,
                        help='Name of the column containing consensus length')
     dedup_parser.add_argument('--species', type=str,
-                           help='Species name for output files')
+                       help='Species name for output files')
     dedup_parser.add_argument('--segment', type=str,
-                           help='Segment name for output files')
-    dedup_parser.add_argument('--lowerthreshold', type=float,
-                       help='Override distance threshold to identify duplicates')
-    dedup_parser.add_argument('--upperthreshold', type=float,
-                       help='Override distance threshold for intrahost variation')
+                       help='Segment name for output files')
+    dedup_parser.add_argument('--pairwise-distance', type=float,
+                       help='Override pairwise distance threshold for intrahost variation')
+    dedup_parser.add_argument('--z-threshold', type=float,
+                       help='Override z threshold for intrahost variation')
+    dedup_parser.add_argument('--clade-size', type=float,
+                       help='Override clade size threshold for intrahost variation')
+    dedup_parser.add_argument('--clade-size', type=float,
+                       help='Override clade size threshold for intrahost variation')
     dedup_parser.add_argument('--config', '-c', type=str,
                        help='Path to configuration file with segment-specific thresholds')
     dedup_parser.add_argument(

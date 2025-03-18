@@ -28,15 +28,13 @@ def mock_config():
         "DEDUPLICATE": {
             "THRESHOLDS": {
                 "L": {
-                    "LOWER": 0.01,
-                    "UPPER": 0.03,
+                    "PWD": 0.01,
                     "CLADE_SIZE": 15,
                     "Z_THRESHOLD": 2.5,
                     "TARGET_LENGTH": 7000
                 },
                 "S": {
-                    "LOWER": 0.03,
-                    "UPPER": 0.07,
+                    "PWD": 0.03,
                     "CLADE_SIZE": 8,
                     "Z_THRESHOLD": 1.8,
                     "TARGET_LENGTH": 3500
@@ -92,7 +90,7 @@ def mock_classifications():
             reason='Test reason',
             sample_id='sample1',
             group_members=['A', 'B'],
-            decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+            decision_category=DecisionCategory.BELOW_THRESHOLD,
             contig_stats={'length': 1000, 'coverage': 20.5}
         ),
         'B': Classification(
@@ -101,7 +99,7 @@ def mock_classifications():
             reason='Test reason',
             sample_id='sample1',
             group_members=['A', 'B'],
-            decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+            decision_category=DecisionCategory.BELOW_THRESHOLD,
             contig_stats={'length': 950, 'coverage': 15.2}
         )
     }

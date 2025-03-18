@@ -63,7 +63,7 @@ def test_write_results():
             reason='test good',
             sample_id='sample1',
             group_members=['seq1', 'seq2'],
-            decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+            decision_category=DecisionCategory.BELOW_THRESHOLD,
             contig_stats={'length': 7000, 'coverage': 20.5}
         ),
         'seq2': Classification(
@@ -72,7 +72,7 @@ def test_write_results():
             reason='test bad',
             sample_id='sample1',
             group_members=['seq1', 'seq2'],
-            decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+            decision_category=DecisionCategory.BELOW_THRESHOLD,
             contig_stats={'length': 6800, 'coverage': 15.2}
         ),
         'seq3': Classification(

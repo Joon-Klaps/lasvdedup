@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from unittest.mock import MagicMock, patch
 import logging
+import pprint
 
 from lasvdedup.utils.sequence_grouping import (
     group_sequences_by_sample,
@@ -344,8 +345,7 @@ def mock_dependencies():
     }
 
     mock_thresholds = {
-        "LOWER": 0.02,
-        "UPPER": 0.05,
+        "PWD": 0.02,
         "CLADE_SIZE": 5,
         "Z_THRESHOLD": 3.0
     }
@@ -389,8 +389,7 @@ class TestFindDuplicates:
         mock_tree = MagicMock()
 
         thresholds = {
-            "LOWER": 0.02,
-            "UPPER": 0.05,
+            "PWD": 0.02,
             "CLADE_SIZE": 5,
             "Z_THRESHOLD": 3.0
         }
@@ -418,12 +417,12 @@ class TestFindDuplicates:
                 {
                     'seq1': Classification(
                         'seq1', ClassificationType.GOOD, 'test reason', 'sample1',
-                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD,
+                        ['seq1', 'seq2'], DecisionCategory.BELOW_THRESHOLD,
                         {'reads': 100, 'rank': 3}
                     ),
                     'seq2': Classification(
                         'seq2', ClassificationType.BAD, 'test reason', 'sample1',
-                        ['seq1', 'seq2'], DecisionCategory.BELOW_LOWER_THRESHOLD,
+                        ['seq1', 'seq2'], DecisionCategory.BELOW_THRESHOLD,
                         {'reads': 200, 'rank': 1}
                     )
                 },
@@ -558,8 +557,7 @@ class TestClassifySample:
         mock_tree = MagicMock()
 
         thresholds = {
-            "LOWER": 0.02,
-            "UPPER": 0.05,
+            "PWD": 0.02,
             "CLADE_SIZE": 5,
             "Z_THRESHOLD": 3.0
         }
@@ -592,8 +590,8 @@ class TestClassifySample:
         assert result['seq1'].is_good
         assert result['seq1'].decision_category == DecisionCategory.SINGLE_SEQUENCE
 
-    def test_classify_sample_below_lower_threshold(self, mock_dependencies):
-        """Test classification when all distances are below lower threshold."""
+    def test_classify_sample_below_pwd_threshold(self, mock_dependencies):
+        """Test classification when all distances are below pwd threshold."""
         # Create mock distances
         with patch('lasvdedup.utils.sequence_grouping.get_distances') as mock_get_distances:
             mock_get_distances.return_value = [0.01]  # Below threshold
@@ -613,41 +611,11 @@ class TestClassifySample:
         # Should classify seq2 as good (highest reads) and seq1 as bad
         assert len(result) == 2
         assert result['seq2'].is_good
-        assert result['seq2'].decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
+        assert result['seq2'].decision_category == DecisionCategory.BELOW_THRESHOLD
         assert result['seq1'].is_bad
-        assert result['seq1'].decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
+        assert result['seq1'].decision_category == DecisionCategory.BELOW_THRESHOLD
 
-    def test_classify_sample_below_upper_threshold(self, mock_dependencies):
-        """Test classification when all distances are below upper threshold."""
-        # Create mock distances
-        with patch('lasvdedup.utils.sequence_grouping.get_distances') as mock_get_distances:
-            # All distances are below upper threshold (0.05) but above lower (0.02)
-            mock_get_distances.return_value = [0.03]
-
-            # Mock clustering to return two clusters
-            with patch('lasvdedup.utils.sequence_grouping.cluster_sequences') as mock_cluster:
-                # Each sequence is its own cluster (crucial for them to be marked as coinfection)
-                mock_cluster.return_value = [['seq1'], ['seq2']]
-
-                result = classify_sample(
-                    'sample1',
-                    ['seq1', 'seq2'],
-                    mock_dependencies['tips_lookup'],
-                    mock_dependencies['dist_matrix'],
-                    mock_dependencies['contigs_ranked'],
-                    mock_dependencies['tree'],
-                    segment="L",
-                    thresholds=mock_dependencies['thresholds']
-                )
-
-        # Should classify each sequence as coinfection (as each is their own cluster)
-        assert len(result) == 2
-        assert result['seq1'].is_coinfection
-        assert result['seq2'].is_coinfection
-        assert result['seq1'].decision_category == DecisionCategory.BELOW_UPPER_THRESHOLD
-        assert result['seq2'].decision_category == DecisionCategory.BELOW_UPPER_THRESHOLD
-
-    def test_multiple_clusters_below_lower_threshold(self, setup_classify):
+    def test_multiple_clusters_below_pwd_threshold(self, setup_classify):
         """Test scenario with multiple clusters below lower threshold."""
         data = setup_classify
 
@@ -688,19 +656,20 @@ class TestClassifySample:
         # Should identify as potential intrahost variants
         assert len(result) == 4
 
-        # Best sequence from each cluster should be marked as coinfection
-        good_seqs = [seq for seq, cls in result.items() if cls.is_coinfection]
-        assert len(good_seqs) == 2
-        assert 'seq2' in good_seqs  # Highest reads in first cluster
-        assert 'seq6' in good_seqs  # Highest reads in second cluster
+        pprint.pprint(result)
+
+        # Best sequence as all others are below threshold
+        good_seqs = [seq for seq, cls in result.items() if cls.is_good]
+        assert len(good_seqs) == 1
+        assert 'seq2' in good_seqs  # Highest rank in first cluster
 
         # Other sequences should be marked as bad
         assert result['seq1'].is_bad
         assert result['seq5'].is_bad
 
-        # Decision category should be BELOW_UPPER_THRESHOLD
+        # Decision category should be BELOW_THRESHOLD
         for seq in test_sequences:
-            assert result[seq].decision_category == DecisionCategory.BELOW_UPPER_THRESHOLD
+            assert result[seq].decision_category == DecisionCategory.SMALL_CLADE
 
     def test_outlier_detection(self, setup_classify):
         """Test outlier detection logic."""
