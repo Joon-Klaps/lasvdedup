@@ -6,9 +6,6 @@ from pathlib import Path
 import snakemake
 from .utils.resources import get_snakefile_path
 
-# Set up logger
-logger = logging.getLogger("lasvdedup.pipeline")
-
 def run_pipeline(config, dry_run=False):
     """
     Run the LASV deduplication pipeline using Snakemake.
@@ -31,57 +28,40 @@ def run_pipeline(config, dry_run=False):
     # Convert workdir to absolute path
     workdir = os.path.abspath(workdir)
 
-    # Log the working directory being used
-    logger.debug(f"Using working directory: {workdir}")
-
     # Make a copy of the config to avoid modifying the original
     config_copy = config.copy()
 
     # Get the current working directory (where the CLI is invoked)
     cwd = os.getcwd()
-    logger.debug(f"Current working directory: {cwd}")
 
-    # Resolve paths but preserve URLs - Yeah idk what's going on here anymore
+    # Helper function to resolve paths
+    def resolve_path(path_value, is_url_allowed=False):
+        path_str = str(path_value)
+
+        # Skip URLs if allowed
+        if is_url_allowed and path_str.startswith(("http://", "https://")):
+            return path_str
+
+        # Return if already absolute
+        if os.path.isabs(path_str):
+            return path_str
+
+        # Try relative to CWD first
+        cwd_path = os.path.join(cwd, path_str)
+        if os.path.exists(cwd_path):
+            return cwd_path
+
+        # Default to workdir
+        return os.path.join(workdir, path_str)
+
+    # Resolve file and directory paths
     for key in ["CONTIGS_TABLE", "SEQ_DATA_DIR"]:
         if key in config_copy and config_copy[key]:
-            path_value = str(config_copy[key])
+            config_copy[key] = resolve_path(config_copy[key])
 
-            # Skip if already an absolute path
-            if os.path.isabs(path_value):
-                logger.debug(f"Using absolute {key}: {path_value}")
-            else:
-                # Check if file exists relative to current working directory
-                cwd_path = os.path.join(cwd, path_value)
-                if os.path.exists(cwd_path):
-                    config_copy[key] = cwd_path
-                    logger.debug(f"Found {key} in current directory: {cwd_path}")
-                else:
-                    # If not in current directory, try workdir
-                    work_path = os.path.join(workdir, path_value)
-                    config_copy[key] = work_path
-                    logger.debug(f"Using {key} relative to workdir: {work_path}")
-
-                    # Check if path exists and warn if not
-                    if not os.path.exists(work_path):
-                        logger.warning(f"Path for {key} does not exist: {work_path}")
-
-    # Special handling for BASE_DATA_DIR to preserve URLs
+    # Handle BASE_DATA_DIR with URL support
     if "BASE_DATA_DIR" in config_copy and config_copy["BASE_DATA_DIR"]:
-        base_dir = str(config_copy["BASE_DATA_DIR"])
-        # Only convert to absolute path if it's not a URL
-        if not base_dir.startswith(("http://", "https://")):
-            if not os.path.isabs(base_dir):
-                # Check if directory exists relative to current working directory
-                cwd_path = os.path.join(cwd, base_dir)
-                if os.path.exists(cwd_path):
-                    config_copy["BASE_DATA_DIR"] = cwd_path
-                    logger.debug(f"Found BASE_DATA_DIR in current directory: {cwd_path}")
-                else:
-                    # If not in current directory, use workdir
-                    config_copy["BASE_DATA_DIR"] = os.path.join(workdir, base_dir)
-                    logger.debug(f"Using BASE_DATA_DIR relative to workdir: {config_copy['BASE_DATA_DIR']}")
-
-        logger.debug(f"Using BASE_DATA_DIR: {config_copy['BASE_DATA_DIR']}")
+        config_copy["BASE_DATA_DIR"] = resolve_path(config_copy["BASE_DATA_DIR"], is_url_allowed=True)
 
     # Create workdir if it doesn't exist
     os.makedirs(workdir, exist_ok=True)
@@ -97,11 +77,8 @@ def run_pipeline(config, dry_run=False):
         'workdir': workdir,
     }
 
-    try:
-        # Run snakemake using the correct API
-        logger.debug(f"Running snakemake with config: {config_copy}")
-        success = snakemake.snakemake(**snakemake_args)
-        return success
-    except Exception as e:
-        logger.error(f"Error running snakemake: {e}")
-        return False
+
+    # Run snakemake using the correct API
+    success = snakemake.snakemake(**snakemake_args)
+    return success
+

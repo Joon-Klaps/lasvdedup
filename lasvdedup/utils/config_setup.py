@@ -9,7 +9,7 @@ from pathlib import Path
 from .resources import get_config_path
 
 # Set up logger
-logger = logging.getLogger("lasvdedup.cli")
+logger = logging.getLogger("lasvdedup.duplicates")
 
 # Define parameter mapping once at module level
 # Format: 'cli_arg_name': ('config_path', transform_function or None)

@@ -43,7 +43,7 @@ def sort_table(table_path: Path, length_column:str,
         raise ValueError(f"Selection column(s) {missing_columns} not found in table: {table_path}")
 
     # Calculate distance to expected length
-    contigs_df["distance_to_expectation"] = abs(contigs_df[length_column] - expected_length)
+    contigs_df["distance_to_expectation"] = abs(contigs_df[length_column] - float(expected_length))
 
     # Filter contigs by selection columns
     rank_columns = ["distance_to_expectation"] + selection_columns
