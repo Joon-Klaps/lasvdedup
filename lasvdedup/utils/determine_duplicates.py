@@ -23,13 +23,16 @@ def setup_logging(level=logging.INFO, filepath=None):
     """Configure logging for the duplicate detection module."""
     logger.setLevel(level)
 
+    # Prevent propagation to prevent duplicate log messages
+    logger.propagate = False
+
     # Clear existing handlers to avoid duplicates
     if logger.handlers:
         for handler in logger.handlers[:]:
             logger.removeHandler(handler)
 
     # Create console handler
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(filename)s:%(funcName)s - %(levelname)s - %(message)s')
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
@@ -122,7 +125,9 @@ def determine_duplicates(
     contigs_ranked = sort_table(contig_table, length_column,
         selection_columns, expected_length=thresholds["TARGET_LENGTH"])
 
-    sample_regex = config.get("SAMPLE_REGEX", r'(LVE\d+)_.*')
+    if (sample_regex := config.get("SAMPLE_REGEX") or config.get("DEDUPLICATE", {}).get("SAMPLE_REGEX")) is None:
+        logger.warning("SAMPLE_REGEX not found in config or CLI arguments - defaulting to '(LVE\\d+)'")
+        sample_regex = r'(LVE\d+)'
 
     # Group sequences by sample
     sample_to_seqs = group_sequences_by_sample(tips, sample_regex)

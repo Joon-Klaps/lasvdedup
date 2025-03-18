@@ -75,7 +75,6 @@ def get_contig_data(seq_name: str, contigs_ranked: Dict[str, Dict[str, float]]) 
         if seq_name.startswith(key) and (len(seq_name) == len(key) or seq_name[len(key)] == '.'):
             return contigs_ranked[key]
 
-    logger.warning(f"Data not found for sequence: {seq_name}")
     raise ValueError(f"Data not found for sequence: {seq_name}")
 
 def select_best_sequence(seq_names, seq_data):
@@ -205,6 +204,7 @@ def classify_sample(
     # Initialize results dictionary
     classifications = {}
     group_members = list(seq_names)  # All sequences in this sample
+    stats = {seq: get_contig_data(seq, contigs_ranked) for seq in seq_names}
 
     # Case 1:  Handle single sequence case
     if len(seq_names) <= 1:
@@ -216,13 +216,12 @@ def classify_sample(
                 sample_id=sample_id,
                 group_members=group_members,
                 decision_category=DecisionCategory.SINGLE_SEQUENCE,  # Set decision category
-                contig_stats=contigs_ranked[seq]
+                contig_stats=stats[seq]
             )
         return classifications
 
     # Get pairwise distances and ranks
     distances = get_distances(seq_names, tips_lookup, dist_matrix)
-    stats = {seq: get_contig_data(seq, contigs_ranked) for seq in seq_names}
 
     # Case 2: All distances below lower threshold (simple duplicates)
     if is_all_distances_below_threshold(distances, thresholds["PWD"]):
@@ -262,7 +261,7 @@ def classify_sample(
     if clade_size <= thresholds["CLADE_SIZE"]:
         logger.debug("Sample %s: Small MRCA clade size (%d) - likely false positive", sample_id, clade_size)
 
-        best_seq = select_best_sequence(seq_names, contigs_ranked)
+        best_seq = select_best_sequence(seq_names, stats)
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
             classification_type=ClassificationType.GOOD,
@@ -299,7 +298,7 @@ def classify_sample(
         if not good_seqs:
             logger.error("No good sequences found after removing outliers: %s", outlier_names)
 
-        best_seq = select_best_sequence(good_seqs, contigs_ranked)
+        best_seq = select_best_sequence(good_seqs, stats)
 
         classifications[best_seq] = Classification(
             sequence_name=best_seq,
