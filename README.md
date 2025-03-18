@@ -12,12 +12,8 @@ For the deduplication we set 3 (+1) empirical thresholds:
 
 ```mermaid
 graph TD;
-    A[Pairwise distance X > Lower Threshold?] -->|No| B[Select sequence with most mapping reads]
-    A -->|Yes| C[Pairwise distance X > Upper Threshold?]
-
-    C -->|No| D[Check for INTRAHOST evolutionary coinfection]
-    D --> J[Cluster sequences based on Lower Threshold and select cluster representative based on most mapped reads]
-    C -->|Yes| E[Clade size of MRCA > 8?]
+    A[Pairwise distance X > PWD Threshold?] -->|No| B[Select sequence with most closest consensus size to reference length]
+    A -->|Yes| E[Clade size of MRCA > 8?]
 
     E -->|No| F[False Positive: Single long branch ~ Highly Unlikely]
     E -->|Yes| G[Pick a random base sequence. Any distances to it an outlier?]
@@ -26,8 +22,7 @@ graph TD;
     G -->|No| I[TRUE Coinfection]
 ```
 
-The Concept is that a natural intrahost codivergence evolution has occured within an expected range of `Lower Threshold` and `Upper threshold`. When the divergence is higher then `Upper threshold` we check how closely related the genomes are. If they are apart of a clade with more then `Clade size threshold` members, we assume that the divergence is due to a coinfection event - given that one of the branches towards a random selected reference is not an outlier. If the clade is smaller then `Clade size threshold` we assume that the divergence is due to a false positive as the clade is small yet there is a very large divergence present.
-
+The Concept is that sequences with a divergence higher then the `--pairwise-distance` threshold, are unlikely to have occured from a single infection. To go double check this, the algorithm checks if the sequences are apart of a clade with more then `--clade-size` members. If the sequences are closely located (small clade), we assume that this is a false positive and they still belong to a single infection. If it is larger then the clade threshold and we don't see any outlying large branches (`> z-threshold * MAD`), we assume that this is a true coinfection.
 
 ## Installation
 

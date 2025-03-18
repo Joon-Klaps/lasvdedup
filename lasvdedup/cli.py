@@ -74,8 +74,8 @@ def parse_args():
                        help='Override z threshold for intrahost variation')
     dedup_parser.add_argument('--clade-size', type=float,
                        help='Override clade size threshold for intrahost variation')
-    dedup_parser.add_argument('--clade-size', type=float,
-                       help='Override clade size threshold for intrahost variation')
+    dedup_parser.add_argument('--target-length', type=float,
+                       help='Override target length for intrahost variation')
     dedup_parser.add_argument('--config', '-c', type=str,
                        help='Path to configuration file with segment-specific thresholds')
     dedup_parser.add_argument(
