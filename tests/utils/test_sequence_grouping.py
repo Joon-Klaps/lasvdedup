@@ -347,7 +347,7 @@ def mock_dependencies():
     mock_thresholds = {
         "PWD": 0.02,
         "CLADE_SIZE": 5,
-        "Z_THRESHOLD": 3.0
+        "QUANTILE": 0.995,
     }
 
     # Mock functions
@@ -391,7 +391,7 @@ class TestFindDuplicates:
         thresholds = {
             "PWD": 0.02,
             "CLADE_SIZE": 5,
-            "Z_THRESHOLD": 3.0
+            "QUANTILE": 0.995
         }
 
         return {
@@ -559,7 +559,7 @@ class TestClassifySample:
         thresholds = {
             "PWD": 0.02,
             "CLADE_SIZE": 5,
-            "Z_THRESHOLD": 3.0
+            "QUANTILE": 0.995
         }
 
         return {

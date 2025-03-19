@@ -285,10 +285,10 @@ def classify_sample(
 
         return classifications
 
-    # Case 4: Check for outliers - use the provided z_threshold parameter
+    # Case 4: Check for outliers - use the provided quantile parameter
     logger.debug("Sample %s: Large MRCA clade size (%d) - checking for outliers", sample_id, clade_size)
 
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["Z_THRESHOLD"])
+    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["QUANTILE"])
 
     if outliers:
         outlier_names = ", ".join(outliers.keys())

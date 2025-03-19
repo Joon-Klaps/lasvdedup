@@ -30,13 +30,13 @@ def mock_config():
                 "L": {
                     "PWD": 0.01,
                     "CLADE_SIZE": 15,
-                    "Z_THRESHOLD": 2.5,
+                    "QUANTILE": 95,
                     "TARGET_LENGTH": 7000
                 },
                 "S": {
                     "PWD": 0.03,
                     "CLADE_SIZE": 8,
-                    "Z_THRESHOLD": 1.8,
+                    "QUANTILE": 80,
                     "TARGET_LENGTH": 3500
                 }
             }

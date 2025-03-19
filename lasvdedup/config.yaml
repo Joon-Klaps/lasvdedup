@@ -30,12 +30,12 @@ DEDUPLICATE:
     - "(general_stats) mosdepth 10X coverage"
   THRESHOLDS:
     L:  # L segment
-      PWD: 0.02
+      PWD: 0.00072
       CLADE_SIZE: 8
-      Z_THRESHOLD: 2
+      QUANTILE: 0.85
       TARGET_LENGTH: 7200
     S:  # S segment
-      PWD: 0.02
+      PWD: 0.00093
       CLADE_SIZE: 8
-      Z_THRESHOLD: 2.0
+      QUANTILE: 0.85
       TARGET_LENGTH: 3400

@@ -31,11 +31,11 @@ DEDUPLICATE:
     L:  # L segment
       PWD: 0.02
       CLADE_SIZE: 8
-      Z_THRESHOLD: 2
+      QUANTILE: 0.85
       TARGET_LENGTH: 7200
     S:  # S segment
       PWD: 0.02
       CLADE_SIZE: 8
-      Z_THRESHOLD: 2.0
+      QUANTILE: 0.85
       TARGET_LENGTH: 3400
 

@@ -3,12 +3,13 @@ import pytest
 import tempfile
 import numpy as np
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from lasvdedup.utils.distance_matrix import (
     get_distances,
     get_outliers,
-    to_distance_matrix
+    to_distance_matrix,
+    calculate_dist_bootstrap
 )
 
 class MockPhyloDM:
@@ -70,6 +71,18 @@ def test_get_distances():
     assert 0.2 in distances  # A-C
     assert 0.3 in distances  # B-C
 
+@patch('numpy.random.choice')
+def test_calculate_dist_bootstrap(mock_choice):
+    """Test bootstrap calculation for distance variance."""
+    # Mock the random sampling to return predictable values
+    mock_choice.return_value = np.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]])
+
+    distances = np.array([1.0, 2.0, 3.0])
+    result = calculate_dist_bootstrap(distances, n_bootstraps=2, quantile=0.95)
+
+    # Based on our mock, means should be [2.0, 3.0], and 95th percentile would be 2.95
+    assert result == 2.95
+
 def test_get_outliers():
     """Test identifying outlier sequences."""
     # Create sample data
@@ -87,7 +100,7 @@ def test_get_outliers():
     ])
 
     # Call the function
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=2.0)
+    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, quantile=0.85)
 
     # Verify results
     assert isinstance(outliers, dict), "get_outliers should return a dictionary"
@@ -101,12 +114,25 @@ def test_get_outliers():
     assert 'threshold' in outliers['C'], "Outlier info should contain threshold"
     assert 'reference' in outliers['C'], "Outlier info should contain reference"
 
-    # Test with a lower z_threshold that includes more outliers
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=1.0)
+    # Test with a lower quantile that includes more outliers
+    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, quantile=0.60)
     assert len(outliers) > 0, "With lower z-threshold, should find at least one outlier"
 
     # Test with all identical distances (no outliers)
     uniform_matrix = np.ones((5, 5)) * 0.1
     np.fill_diagonal(uniform_matrix, 0.0)
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, uniform_matrix)
-    assert outliers == {}, "With uniform distances, should find no outliers"
+
+    # Test the MAD = 0 case using a uniform matrix where bootstrap is needed
+    with patch('lasvdedup.utils.distance_matrix.calculate_dist_bootstrap', return_value=0.15):
+        outliers = get_outliers(clade_members, seq_names, tips_lookup, uniform_matrix)
+        assert outliers == {}, "With uniform distances and threshold=0.15, should find no outliers"
+
+    # Test the MAD = 0 case with a higher bootstrap value that would cause outliers
+    with patch('lasvdedup.utils.distance_matrix.calculate_dist_bootstrap', return_value=0.05):
+        # Setting up a case where some distances exceed the bootstrap threshold
+        test_matrix = uniform_matrix.copy()
+        test_matrix[3, 2] = 0.12  # Distance from D (ref) to C is 0.12, above threshold of 0.05
+        test_matrix[2, 3] = 0.12  # Make symmetric
+
+        outliers = get_outliers(clade_members, seq_names, tips_lookup, test_matrix)
+        assert 'C' in outliers, "With MAD=0 and threshold=0.05, C should be identified as outlier"
