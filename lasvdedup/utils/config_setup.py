@@ -40,7 +40,7 @@ PARAMETER_MAPPING = {
 
 THRESHOLD_MAPPING = {
     'pairwise-distance': 'PWD',
-    'quantile': 'QUANTILE',
+    'z-threshold': 'Z_THRESHOLD',
     'clade-size': 'CLADE_SIZE',
     'target-length': 'TARGET_LENGTH',
 }
@@ -104,8 +104,8 @@ def build_config(args):
 
         if 'pairwise-distance' in cli_config:
             thresholds['PWD'] = cli_config.pop('pairwise-distance')
-        if 'quantile' in cli_config:
-            thresholds['QUANTILE'] = cli_config.pop('quantile')
+        if 'z-threshold' in cli_config:
+            thresholds['Z_THRESHOLD'] = cli_config.pop('z_threshold')
         if 'clade-size' in cli_config:
             thresholds['CLADE_SIZE'] = cli_config.pop('clade-size')
         if 'target-length' in cli_config:

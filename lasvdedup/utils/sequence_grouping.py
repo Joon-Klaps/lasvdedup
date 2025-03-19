@@ -254,7 +254,7 @@ def classify_sample(
     logger.debug("Sample %s: Some distances above upper threshold - checking MRCA", sample_id)
 
     # Get MRCA clade members
-    clade_members = get_mrca_clade(seq_names, tree)
+    clade, clade_members = get_mrca_clade(seq_names, tree)
     clade_size = len(clade_members)
 
     # Case 3: Small MRCA clade (likely false positive)
@@ -285,10 +285,10 @@ def classify_sample(
 
         return classifications
 
-    # Case 4: Check for outliers - use the provided quantile parameter
+    # Case 4: Check for outliers - use the provided PWD & Z-threshold parameter
     logger.debug("Sample %s: Large MRCA clade size (%d) - checking for outliers", sample_id, clade_size)
 
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, thresholds["QUANTILE"])
+    outliers = get_outliers(clade, seq_names, evolution_threshold=thresholds["PWD"]/thresholds["Z_THRESHOLD"], z_threshold=thresholds["Z_THRESHOLD"])
 
     if outliers:
         outlier_names = ", ".join(outliers.keys())
@@ -296,7 +296,8 @@ def classify_sample(
 
         good_seqs = [seq for seq in seq_names if seq not in outliers]
         if not good_seqs:
-            logger.error("No good sequences found after removing outliers: %s", outlier_names)
+            logger.warning("No good sequences found after removing outliers: %s", outlier_names)
+            good_seqs = seq_names
 
         best_seq = select_best_sequence(good_seqs, stats)
 

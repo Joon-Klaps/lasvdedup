@@ -347,7 +347,7 @@ def mock_dependencies():
     mock_thresholds = {
         "PWD": 0.02,
         "CLADE_SIZE": 5,
-        "QUANTILE": 0.995,
+        "Z_THRESHOLD": 3,
     }
 
     # Mock functions
@@ -391,7 +391,7 @@ class TestFindDuplicates:
         thresholds = {
             "PWD": 0.02,
             "CLADE_SIZE": 5,
-            "QUANTILE": 0.995
+            "Z_THRESHOLD": 2,
         }
 
         return {
@@ -559,7 +559,7 @@ class TestClassifySample:
         thresholds = {
             "PWD": 0.02,
             "CLADE_SIZE": 5,
-            "QUANTILE": 0.995
+            "Z_THRESHOLD": 2,
         }
 
         return {
@@ -683,17 +683,19 @@ class TestClassifySample:
             # Need to patch the exact import location as used in the sequence_grouping module
             with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
                 # Set the return value for the MRCA clade
-                mock_mrca.return_value = ['seq1', 'seq2', 'seq3', 'seq4', 'seq5', 'seq6', 'otherseq']
+                mock_clade = MagicMock()
+                mock_mrca.return_value = (mock_clade, ['seq1', 'seq2', 'seq3', 'seq4', 'seq5', 'seq6', 'otherseq'])
 
                 # Also patch get_outliers
                 with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
                     # seq4 is an outlier
-                    mock_outliers.return_value =  { "seq4" :
-                        {'distance': float(0.06),
-                        'median': float(0.04),
-                        'threshold': float(0.05),
-                        'reference': 'seq1',
-                    }}
+                    mock_outliers.return_value = {
+                        "seq4": {
+                            'distance': 0.06,
+                            'median': 0.04,
+                            'threshold': 0.05
+                        }
+                    }
 
                     result = classify_sample(
                         'sample1',
@@ -706,15 +708,13 @@ class TestClassifySample:
                         thresholds=data['thresholds']
                     )
 
-                    print(result)
-
         # Should identify seq4 as outlier and mark it as BAD
         assert result['seq4'].is_bad
         assert result['seq4'].decision_category == DecisionCategory.OUTLIERS_DETECTED
 
         # Should select sequence with highest read count among non-outliers as GOOD
         non_outliers = ['seq1', 'seq2', 'seq3']
-        best_seq = max(non_outliers, key=lambda seq: data['contigs_ranked'][seq]['reads'])
+        best_seq = min(non_outliers, key=lambda seq: data['contigs_ranked'][seq]['rank'])
         assert result[best_seq].is_good
         assert result[best_seq].decision_category == DecisionCategory.OUTLIERS_DETECTED
 
@@ -722,32 +722,32 @@ class TestClassifySample:
         """Test true coinfection scenario."""
         data = setup_classify
 
-        dist_matrix = np.array([
-            [0.0, 0.06, 0.06],
-            [0.06, 0.0, 0.06],
-            [0.06, 0.06, 0.0],
-        ])
+        # Create a scenario with distances above thresholds
+        with patch('lasvdedup.utils.sequence_grouping.get_distances') as mock_distances:
+            # Make sure we're triggering the path for distances above threshold
+            mock_distances.return_value = [0.06, 0.06, 0.06]
 
-        # Need to patch the exact import location as used in the sequence_grouping module
-        with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
-            # Set the return value to a large enough clade
-            mock_mrca.return_value = ['seq1', 'seq2', 'seq3', 'seq4', 'seq5', 'seq6', 'otherseq1', 'otherseq2']
+            # Need to patch the exact import location as used in the sequence_grouping module
+            with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
+                # Set the return value to a large enough clade
+                mock_clade = MagicMock()
+                mock_mrca.return_value = (mock_clade, ['seq1', 'seq2', 'seq4', 'seq5', 'seq6', 'otherseq1', 'otherseq2'])
 
-            # Also patch get_outliers
-            with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
-                # No outliers
-                mock_outliers.return_value = []
+                # Also patch get_outliers
+                with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
+                    # No outliers
+                    mock_outliers.return_value = {}
 
-                result = classify_sample(
-                    'sample1',
-                    ['seq1', 'seq2', 'seq4'],
-                    data['tips_lookup'],
-                    data['dist_matrix'],
-                    data['contigs_ranked'],
-                    data['tree'],
-                    segment="L",
-                    thresholds=data['thresholds']
-                )
+                    result = classify_sample(
+                        'sample1',
+                        ['seq1', 'seq2', 'seq4'],
+                        data['tips_lookup'],
+                        data['dist_matrix'],
+                        data['contigs_ranked'],
+                        data['tree'],
+                        segment="L",
+                        thresholds=data['thresholds']
+                    )
 
         # All sequences should be marked as coinfection
         assert all(cls.is_coinfection for cls in result.values())
@@ -757,32 +757,32 @@ class TestClassifySample:
         """Test true coinfection scenario."""
         data = setup_classify
 
-        dist_matrix = np.array([
-            [0.0, 0.06, 0.06],
-            [0.06, 0.0, 0.06],
-            [0.06, 0.06, 0.0],
-        ])
+        # Create a scenario with distances above thresholds
+        with patch('lasvdedup.utils.sequence_grouping.get_distances') as mock_distances:
+            # Make sure we're triggering the path for distances above threshold
+            mock_distances.return_value = [0.06, 0.06, 0.06]
 
-        # Need to patch the exact import location as used in the sequence_grouping module
-        with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
-            # Set the return value to a large enough clade
-            mock_mrca.return_value = ['seq1', 'seq2', 'seq3', 'seq4', 'seq5', 'seq6', 'otherseq1', 'otherseq2']
+            # Need to patch the exact import location as used in the sequence_grouping module
+            with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
+                # Set the return value to a large enough clade
+                mock_clade = MagicMock()
+                mock_mrca.return_value = (mock_clade, ['seq1', 'seq2', 'seq4', 'seq5', 'seq6', 'otherseq1', 'otherseq2'])
 
-            # Also patch get_outliers
-            with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
-                # No outliers
-                mock_outliers.return_value = []
+                # Also patch get_outliers
+                with patch('lasvdedup.utils.sequence_grouping.get_outliers') as mock_outliers:
+                    # No outliers
+                    mock_outliers.return_value = {}
 
-                result = classify_sample(
-                    'sample1',
-                    ['seq1', 'seq2', 'seq4'],
-                    data['tips_lookup'],
-                    data['dist_matrix'],
-                    data['contigs_ranked'],
-                    data['tree'],
-                    segment="L",
-                    thresholds=data['thresholds']
-                )
+                    result = classify_sample(
+                        'sample1',
+                        ['seq1', 'seq2', 'seq4'],
+                        data['tips_lookup'],
+                        data['dist_matrix'],
+                        data['contigs_ranked'],
+                        data['tree'],
+                        segment="L",
+                        thresholds=data['thresholds']
+                    )
 
         # All sequences should be marked as coinfection
         assert all(cls.is_coinfection for cls in result.values())
@@ -792,20 +792,26 @@ class TestClassifySample:
         """Test small clade scenario."""
         data = setup_classify
 
-        # Mock the get_mrca_clade function to return small clade
-        with patch('lasvdedup.utils.tree_utils.get_mrca_clade') as mock_mrca:
-            mock_mrca.return_value = ['seq1', 'seq2', 'seq4']  # Only 3 sequences
+        # Create a scenario with distances above thresholds
+        with patch('lasvdedup.utils.sequence_grouping.get_distances') as mock_distances:
+            # Make sure we're triggering the path for distances above threshold
+            mock_distances.return_value = [0.06, 0.06, 0.06]
 
-            result = classify_sample(
-                'sample1',
-                ['seq1', 'seq2', 'seq4'],  # These have distances above thresholds between them
-                data['tips_lookup'],
-                data['dist_matrix'],
-                data['contigs_ranked'],
-                data['tree'],
-                segment="L",
-                thresholds=data['thresholds']
-            )
+            # Mock the get_mrca_clade function to return small clade
+            with patch('lasvdedup.utils.sequence_grouping.get_mrca_clade') as mock_mrca:
+                mock_clade = MagicMock()
+                mock_mrca.return_value = (mock_clade, ['seq1', 'seq2', 'seq4'])  # Only 3 sequences
+
+                result = classify_sample(
+                    'sample1',
+                    ['seq1', 'seq2', 'seq4'],  # These have distances above thresholds between them
+                    data['tips_lookup'],
+                    data['dist_matrix'],
+                    data['contigs_ranked'],
+                    data['tree'],
+                    segment="L",
+                    thresholds=data['thresholds']
+                )
 
         # Should select seq2 as good (highest rank) and mark others as bad
         assert result['seq2'].is_good

@@ -9,7 +9,7 @@ For the deduplication we set 3 (+1) empirical thresholds:
     - L: 0.00072
     - S: 0.00093
 - Clade size threshold: 8
-- (Quantile for outliers: 0.85)
+- (Z-threshold for outliers: 2)
 
 ```mermaid
 graph TD;
@@ -23,7 +23,7 @@ graph TD;
     G -->|No| I[TRUE Coinfection]
 ```
 
-The Concept is that sequences with a divergence higher then the `--pairwise-distance` threshold, are unlikely to have occured from a single infection. To go double check this, the algorithm checks if the sequences are apart of a clade with more then `--clade-size` members. If the sequences are closely located (small clade), we assume that this is a false positive and they still belong to a single infection. If it is larger then the clade threshold and we don't see any outlying large branches (`> boostrap quantile`), we assume that this is a true coinfection.
+The Concept is that sequences with a divergence higher then the `--pairwise-distance` threshold, are unlikely to have occured from a single infection. To go double check this, the algorithm checks if the sequences are apart of a clade with more then `--clade-size` members. If the sequences are closely located (small clade), we assume that this is a false positive and they still belong to a single infection. If it is larger then the clade threshold and we don't see any outlying large branches (`> median absoulut deviance * z-threshold`), we assume that this is a true coinfection.
 
 ## Installation
 

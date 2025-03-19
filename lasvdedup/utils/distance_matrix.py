@@ -3,6 +3,7 @@ import logging
 import time
 from typing import List, Tuple, Dict
 from phylodm import PhyloDM
+from Bio import Phylo
 
 logger = logging.getLogger("lasvdedup.duplicates")
 
@@ -41,43 +42,31 @@ def get_distances(names: List , tips_lookup:Dict, matrix:np.ndarray) -> Dict[str
             distances.append(dist)
     return distances
 
-def calculate_dist_bootstrap(distances: np.ndarray, n_bootstraps: int = 1000, quantile: float = 0.85) -> float:
-    """Calculate the bootstrap estimate of variation in distances.
-
-    When MAD is zero, this provides an alternative way to establish a threshold.
-    """
-    n = len(distances)
-    samples = np.random.choice(distances, size=(n_bootstraps, n), replace=True)
-    mad_boot = np.apply_along_axis(np.mean, 1, samples)
-    return np.quantile(mad_boot, quantile)
-
-def get_outliers( clade_members: List[str], seq_names: List[str], tips_lookup: Dict[str, int], dist_matrix: np.ndarray, quantile: float = 85) -> Dict[str, Dict[str, float]]:
+def get_outliers(clade: Phylo, seq_names: List[str], evolution_threshold: float, z_threshold: float = 2) -> Dict[str, Dict[str, float]]:
     """Identify sequences that are outliers based on their distances."""
     logger.debug("Checking for outliers among %d sequences", len(seq_names))
     outliers = {}
-    references = set(clade_members) - set(seq_names)
-    reference = references.pop() # Select one random
-    refid = tips_lookup[reference]
-    distances = [
-        dist_matrix[refid, tips_lookup[member]]
-        for member in clade_members
-        if member != reference
-    ]
+    terminals = clade.get_terminals()
+    clade_depths = clade.depths()
+    distances = [clade_depths[terminal] for terminal in terminals]
 
-    outlier_threshold = calculate_dist_bootstrap(distances, quantile=quantile)
     median = np.median(distances)
-    logger.debug("Outlier threshold set to %.4f", outlier_threshold)
+    mad = np.median(np.abs(distances - median))
+    outlier_threshold = median + z_threshold * mad
+    if mad == 0:
+        logger.warning("MAD is zero - cannot calculate threshold, using evolutionary threshold %.4f", evolution_threshold)
+        # Assume evolutionary threshold +/- 6 months of evolution rate:
+        outlier_threshold = median + evolution_threshold
 
     # Identify outliers
     for seq in seq_names:
-        dist = dist_matrix[tips_lookup[reference], tips_lookup[seq]]
-        logger.debug("Distance from %s to %s: %.4f with median: %.4f and threshold of %.4f", reference, seq, dist, median, outlier_threshold)
+        dist = clade_depths[clade.find_any(seq)]
+        logger.debug("Distance of %s: %.4f with median: %.4f and threshold of %.4f", seq, dist, median, outlier_threshold)
         if dist > outlier_threshold:
             outliers[seq] = {
                 'distance': float(dist),
                 'median': float(median),
-                'threshold': float(outlier_threshold),
-                'reference': reference
+                'threshold': float(outlier_threshold)
             }
 
     return outliers
