@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="lasvdedup",
-    version="0.1.2",
+    version="0.1.3",
     packages=find_packages(),
     include_package_data=True,
     python_requires='>=3.9, <3.13',

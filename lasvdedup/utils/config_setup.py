@@ -39,11 +39,10 @@ PARAMETER_MAPPING = {
 }
 
 THRESHOLD_MAPPING = {
-    'lowerthreshold': 'LOWER',
-    'upperthreshold': 'UPPER',
-    'z_threshold': 'Z_THRESHOLD',
-    'clade_size': 'CLADE_SIZE',
-    'target_length': 'TARGET_LENGTH',
+    'pairwise-distance': 'PWD',
+    'z-threshold': 'Z_THRESHOLD',
+    'clade-size': 'CLADE_SIZE',
+    'target-length': 'TARGET_LENGTH',
 }
 
 def build_config(args):
@@ -103,16 +102,14 @@ def build_config(args):
         segment = cli_config['segment']
         thresholds = {}
 
-        if 'lowerthreshold' in cli_config:
-            thresholds['LOWER'] = cli_config.pop('lowerthreshold')
-        if 'upperthreshold' in cli_config:
-            thresholds['UPPER'] = cli_config.pop('upperthreshold')
-        if 'z_threshold' in cli_config:
+        if 'pairwise-distance' in cli_config:
+            thresholds['PWD'] = cli_config.pop('pairwise-distance')
+        if 'z-threshold' in cli_config:
             thresholds['Z_THRESHOLD'] = cli_config.pop('z_threshold')
-        if 'clade_size' in cli_config:
-            thresholds['CLADE_SIZE'] = cli_config.pop('clade_size')
-        if 'target_length' in cli_config:
-            thresholds['TARGET_LENGTH'] = cli_config.pop('target_length')
+        if 'clade-size' in cli_config:
+            thresholds['CLADE_SIZE'] = cli_config.pop('clade-size')
+        if 'target-length' in cli_config:
+            thresholds['TARGET_LENGTH'] = cli_config.pop('target-length')
 
         if thresholds:
             normalized_cli_config['DEDUPLICATE']['THRESHOLDS'][segment] = thresholds

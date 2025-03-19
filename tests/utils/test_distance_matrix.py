@@ -3,7 +3,7 @@ import pytest
 import tempfile
 import numpy as np
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from lasvdedup.utils.distance_matrix import (
     get_distances,
@@ -73,21 +73,34 @@ def test_get_distances():
 def test_get_outliers():
     """Test identifying outlier sequences."""
     # Create sample data
-    clade_members = ['A', 'B', 'C', 'D', 'E']
-    seq_names = ['A', 'B', 'C']  # We only check these
-    tips_lookup = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4}
+    clade = MagicMock()
+    seq_names = ['A', 'B', 'C']
 
-    # Create a distance matrix where C is an outlier
-    dist_matrix = np.array([
-        [0.0, 0.2, 0.5, 0.2, 0.2],
-        [0.2, 0.0, 0.5, 0.1, 0.1],
-        [0.5, 0.5, 0.0, 0.5, 0.5],
-        [0.2, 0.1, 0.5, 0.0, 0.1],
-        [0.2, 0.1, 0.5, 0.1, 0.0]
-    ])
+    # Setup mock depths for the terminals
+    terminals = [MagicMock() for _ in range(5)]
+    clade.get_terminals.return_value = terminals
 
-    # Call the function
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=2.0)
+    # Create mock clade.depths() return value where C is an outlier
+    clade_depths = {
+        terminals[0]: 0.2,  # A
+        terminals[1]: 0.2,  # B
+        terminals[2]: 0.5,  # C is an outlier
+        terminals[3]: 0.2,  # D
+        terminals[4]: 0.2,  # E
+    }
+    clade.depths.return_value = clade_depths
+
+    # Setup mock find_any to return the correct terminal for each seq name
+    clade.find_any.side_effect = lambda name: {
+        'A': terminals[0],
+        'B': terminals[1],
+        'C': terminals[2],
+    }[name]
+
+    # Call the function with evolution_threshold and z_threshold
+    evolution_threshold = 0.02
+    z_threshold = 2.0
+    outliers = get_outliers(clade, seq_names, evolution_threshold, z_threshold)
 
     # Verify results
     assert isinstance(outliers, dict), "get_outliers should return a dictionary"
@@ -99,14 +112,29 @@ def test_get_outliers():
     assert 'distance' in outliers['C'], "Outlier info should contain distance"
     assert 'median' in outliers['C'], "Outlier info should contain median"
     assert 'threshold' in outliers['C'], "Outlier info should contain threshold"
-    assert 'reference' in outliers['C'], "Outlier info should contain reference"
 
-    # Test with a lower z_threshold that includes more outliers
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, dist_matrix, z_threshold=1.0)
-    assert len(outliers) > 0, "With lower z-threshold, should find at least one outlier"
+    # Test with a higher evolution-threshold that won't detect outliers
+    outliers = get_outliers(clade, seq_names, evolution_threshold=0.4, z_threshold=2)
+    assert len(outliers) == 0, "With higher evolution threshold, should find no outliers"
 
-    # Test with all identical distances (no outliers)
-    uniform_matrix = np.ones((5, 5)) * 0.1
-    np.fill_diagonal(uniform_matrix, 0.0)
-    outliers = get_outliers(clade_members, seq_names, tips_lookup, uniform_matrix)
-    assert outliers == {}, "With uniform distances, should find no outliers"
+    # Test with MAD = 0 case
+    uniform_clade = MagicMock()
+    uniform_terminals = [MagicMock() for _ in range(5)]
+    uniform_clade.get_terminals.return_value = uniform_terminals
+
+    # All terminals have same depth (MAD will be 0)
+    uniform_depths = {terminal: 0.1 for terminal in uniform_terminals}
+    uniform_clade.depths.return_value = uniform_depths
+
+    # Make one sequence slightly higher to test threshold
+    uniform_depths[uniform_terminals[2]] = 0.15  # Above threshold with evolution_threshold = 0.02
+
+    uniform_clade.find_any.side_effect = lambda name: {
+        'A': uniform_terminals[0],
+        'B': uniform_terminals[1],
+        'C': uniform_terminals[2],
+    }[name]
+
+    # With evolution_threshold, C should be detected
+    outliers = get_outliers(uniform_clade, seq_names, evolution_threshold=0.02, z_threshold=2.0)
+    assert 'C' in outliers, "With MAD=0 and evolution_threshold=0.02, C should be identified as outlier"

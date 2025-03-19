@@ -14,7 +14,7 @@ def test_classification_initialization():
         reason="Test reason",
         sample_id="sample1",
         group_members=["seq1", "seq2"],
-        decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 10.5, "identity": 98.2}
     )
 
@@ -23,7 +23,7 @@ def test_classification_initialization():
     assert classification.reason == "Test reason"
     assert classification.sample_id == "sample1"
     assert classification.group_members == ["seq1", "seq2"]
-    assert classification.decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
+    assert classification.decision_category == DecisionCategory.BELOW_THRESHOLD
     assert classification.contig_stats == {"coverage": 10.5, "identity": 98.2}
 
     # Create a classification with different parameters
@@ -33,7 +33,7 @@ def test_classification_initialization():
         reason="Bad sequence",
         sample_id="sample2",
         group_members=["seq2", "seq3"],
-        decision_category=DecisionCategory.BELOW_UPPER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 5.2, "identity": 85.7}
     )
 
@@ -42,7 +42,7 @@ def test_classification_initialization():
     assert classification.reason == "Bad sequence"
     assert classification.sample_id == "sample2"
     assert classification.group_members == ["seq2", "seq3"]
-    assert classification.decision_category == DecisionCategory.BELOW_UPPER_THRESHOLD
+    assert classification.decision_category == DecisionCategory.BELOW_THRESHOLD
     assert classification.contig_stats == {"coverage": 5.2, "identity": 85.7}
 
 def test_classification_properties():
@@ -63,7 +63,7 @@ def test_classification_properties():
         reason="Bad sequence",
         sample_id="sample1",
         group_members=["bad"],
-        decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 5.0}
     )
 
@@ -103,7 +103,7 @@ def test_classification_to_line():
         reason="Test reason",
         sample_id="sample1",
         group_members=["seq1", "seq2"],
-        decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 10.5}
     )
 
@@ -113,7 +113,7 @@ def test_classification_to_line():
     parts = line.split("\t")
     assert parts[0] == "seq1"  # sequence_name
     assert parts[1] == "good"  # classification_type.value
-    assert parts[2] == "BelowLowerThreshold"  # decision_category.value
+    assert parts[2] == "BelowThreshold"  # decision_category.value
     assert parts[3] == "{'coverage': 10.5}" or str(parts[3]) == str({"coverage": 10.5})  # contig_stats
     assert parts[4] == "sample1"  # sample_id
     assert parts[5] == "['seq1', 'seq2']"  # group_members
@@ -137,7 +137,7 @@ def test_classification_to_annotation_line():
         reason="Test reason",
         sample_id="sample1",
         group_members=["seq1", "seq2"],
-        decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 10.5}
     )
 
@@ -147,7 +147,7 @@ def test_classification_to_annotation_line():
     parts = line.split("\t")
     assert parts[0] == "seq1"  # sequence_name
     assert parts[1] == "good"  # classification_type.value
-    assert parts[2] == "BelowLowerThreshold"  # decision_category.value
+    assert parts[2] == "BelowThreshold"  # decision_category.value
     assert parts[3] == "sample1"  # sample_id
 
     # Test annotation header line
@@ -165,7 +165,7 @@ def test_classification_to_dict():
         reason="Test reason",
         sample_id="sample1",
         group_members=["seq1", "seq2"],
-        decision_category=DecisionCategory.BELOW_LOWER_THRESHOLD,
+        decision_category=DecisionCategory.BELOW_THRESHOLD,
         contig_stats={"coverage": 10.5}
     )
 
@@ -175,7 +175,7 @@ def test_classification_to_dict():
     assert result["reason"] == "Test reason"
     assert result["sample_id"] == "sample1"
     assert result["group_members"] == ["seq1", "seq2"]
-    assert result["decision_category"] == DecisionCategory.BELOW_LOWER_THRESHOLD
+    assert result["decision_category"] == DecisionCategory.BELOW_THRESHOLD
     assert result["contig_stats"] == {"coverage": 10.5}
 
 def test_classification_from_dict():
@@ -185,7 +185,7 @@ def test_classification_from_dict():
         "reason": "Test reason",
         "sample_id": "sample1",
         "group_members": ["seq1", "seq2"],
-        "decision_category": DecisionCategory.BELOW_LOWER_THRESHOLD,
+        "decision_category": DecisionCategory.BELOW_THRESHOLD,
         "contig_stats": {"coverage": 10.5}
     }
 
@@ -196,7 +196,7 @@ def test_classification_from_dict():
     assert classification.reason == "Test reason"
     assert classification.sample_id == "sample1"
     assert classification.group_members == ["seq1", "seq2"]
-    assert classification.decision_category == DecisionCategory.BELOW_LOWER_THRESHOLD
+    assert classification.decision_category == DecisionCategory.BELOW_THRESHOLD
     assert classification.contig_stats == {"coverage": 10.5}
 
     # Test with invalid classification type

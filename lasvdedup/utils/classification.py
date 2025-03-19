@@ -16,12 +16,10 @@ class ClassificationType(Enum):
 class DecisionCategory(Enum):
     """Enum representing possible decision categories in the detection algorithm."""
     SINGLE_SEQUENCE = "SingleSequence"
-    BELOW_LOWER_THRESHOLD = "BelowLowerThreshold"
-    BELOW_UPPER_THRESHOLD = "BelowUpperThreshold"
+    BELOW_THRESHOLD = "BelowThreshold"
     SMALL_CLADE = "SmallClade"
     OUTLIERS_DETECTED = "OutliersDetected"
     TRUE_COINFECTION = "TrueCoinfection"
-    NO_TREE = "NoTree"
 
 @dataclass
 class Classification:
