@@ -113,9 +113,9 @@ def test_get_outliers():
     assert 'median' in outliers['C'], "Outlier info should contain median"
     assert 'threshold' in outliers['C'], "Outlier info should contain threshold"
 
-    # Test with a higher z-threshold that won't detect outliers
-    outliers = get_outliers(clade, seq_names, evolution_threshold, z_threshold=5.0)
-    assert len(outliers) == 0, "With higher z-threshold, should find no outliers"
+    # Test with a higher evolution-threshold that won't detect outliers
+    outliers = get_outliers(clade, seq_names, evolution_threshold=0.4, z_threshold=2)
+    assert len(outliers) == 0, "With higher evolution threshold, should find no outliers"
 
     # Test with MAD = 0 case
     uniform_clade = MagicMock()

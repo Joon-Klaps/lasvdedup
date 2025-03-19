@@ -48,13 +48,13 @@ def test_get_mrca_clade():
     tree = Bio.Phylo.read(StringIO(tree_str), 'newick')
 
     # Test with two sequences
-    clade_members = get_mrca_clade(['A', 'B'], tree)
+    _, clade_members = get_mrca_clade(['A', 'B'], tree)
     assert sorted(clade_members) == ['A', 'B']
 
     # Test with sequences in different clades
-    clade_members = get_mrca_clade(['A', 'C'], tree)
+    _, clade_members = get_mrca_clade(['A', 'C'], tree)
     assert sorted(clade_members) == ['A', 'B', 'C', 'E']
 
     # Test with all sequences
-    clade_members = get_mrca_clade(['A', 'B', 'C', 'D', 'E'], tree)
+    _,clade_members = get_mrca_clade(['A', 'B', 'C', 'D', 'E'], tree)
     assert sorted(clade_members) == ['A', 'B', 'C', 'D', 'E']
