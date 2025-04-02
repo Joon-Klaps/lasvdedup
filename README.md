@@ -17,13 +17,13 @@ graph TD;
     A -->|Yes| E[Clade size of MRCA > 8?]
 
     E -->|No| F[False Positive: Single long branch ~ Highly Unlikely]
-    E -->|Yes| G[Pick a random base sequence. Any distances to it an outlier?]
+    E -->|Yes| G[Determine distances to clade root (MRCA). Any distances to it an outlier?]
 
-    G -->|Yes| H[False Positive: Need for a single selection]
+    G -->|Yes| H[False Positive: Need for a deduplication]
     G -->|No| I[TRUE Coinfection]
 ```
 
-The Concept is that sequences with a divergence higher then the `--pairwise-distance` threshold, are unlikely to have occured from a single infection. To go double check this, the algorithm checks if the sequences are apart of a clade with more then `--clade-size` members. If the sequences are closely located (small clade), we assume that this is a false positive and they still belong to a single infection. If it is larger then the clade threshold and we don't see any outlying large branches (`> median absoulut deviance * z-threshold`), we assume that this is a true coinfection.
+The Concept is that sequences with a divergence higher then the `--pairwise-distance` threshold, are unlikely to have occured from a single infection. To go double check this, the algorithm checks if the sequences are apart of a clade with more then `--clade-size` members. If the sequences are closely located (small clade), we assume that this is a false positive and they still belong to a single infection. If it is larger then the clade threshold and we don't see any outlying large branches (`> median absoulut deviance * z-threshold`) to the clade root (MRCA), we assume that this is a true coinfection.
 
 ## Installation
 
@@ -42,6 +42,24 @@ pip install -e .
 ```bash
 # Example command
 lasvdedup --help
+```
+
+Run the pipeline:
+
+```bash
+lasvdedup --input <contigs-overview.tsv> --seq-dir <seq_dir|it2>
+```
+
+Run only the deduplication step:
+
+```bash
+lasvdedup deduplicate \ 
+    --tree <treefile> \
+    --sequences <sequences> \
+    --prefix <prefix> \
+    --species <species> \
+    --segment <segment> \
+    --table <contigs-overview.tsv> \
 ```
 
 ## Development
