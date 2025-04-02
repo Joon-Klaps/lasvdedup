@@ -17,7 +17,7 @@ graph TD;
     A -->|Yes| E[Clade size of MRCA > 8?]
 
     E -->|No| F[False Positive: Single long branch ~ Highly Unlikely]
-    E -->|Yes| G[Determine distances to clade root (MRCA). Any distances to it an outlier?]
+    E -->|Yes| G[Determine distances to clade root - MRCA. Any distances to it an outlier?]
 
     G -->|Yes| H[False Positive: Need for a deduplication]
     G -->|No| I[TRUE Coinfection]
