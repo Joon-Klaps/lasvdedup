@@ -46,5 +46,4 @@ def get_mrca_clade(seq_names, tree):
     mrca = tree.common_ancestor([tree.find_any(name) for name in seq_names])
 
     # Get all terminals in this clade
-    return [terminal.name for terminal in mrca.get_terminals()]
-
+    return mrca, [terminal.name for terminal in mrca.get_terminals()]

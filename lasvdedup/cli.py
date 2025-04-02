@@ -10,9 +10,6 @@ from .utils.determine_duplicates import determine_duplicates
 from .utils.config_setup import build_config
 from .pipeline import run_pipeline
 
-# Set up logger
-logger = logging.getLogger("lasvdedup.cli")
-
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description='LASV deduplication pipeline')
@@ -65,13 +62,17 @@ def parse_args():
     dedup_parser.add_argument('--length-column', type=str,
                        help='Name of the column containing consensus length')
     dedup_parser.add_argument('--species', type=str,
-                           help='Species name for output files')
+                       help='Species name for output files')
     dedup_parser.add_argument('--segment', type=str,
-                           help='Segment name for output files')
-    dedup_parser.add_argument('--lowerthreshold', type=float,
-                       help='Override distance threshold to identify duplicates')
-    dedup_parser.add_argument('--upperthreshold', type=float,
-                       help='Override distance threshold for intrahost variation')
+                       help='Segment name for output files')
+    dedup_parser.add_argument('--pairwise-distance', type=float,
+                       help='Override pairwise distance threshold for intrahost variation')
+    dedup_parser.add_argument('--z-threshold', type=float,
+                       help='Override z threshold for intrahost variation')
+    dedup_parser.add_argument('--clade-size', type=float,
+                       help='Override clade size threshold for intrahost variation')
+    dedup_parser.add_argument('--target-length', type=float,
+                       help='Override target length for intrahost variation')
     dedup_parser.add_argument('--config', '-c', type=str,
                        help='Path to configuration file with segment-specific thresholds')
     dedup_parser.add_argument(
@@ -96,33 +97,21 @@ def main():
     """Main entry point for the CLI."""
     args = parse_args()
 
-    # Setup basic logging
-    logging.basicConfig(
-        level=getattr(logging, args.log_level if hasattr(args, 'log_level') else 'WARNING'),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    if args.command == 'run':
+        # Build complete configuration
+        config = build_config(args)
 
-    try:
-        if args.command == 'run':
-            # Build complete configuration
-            config = build_config(args)
+        # Run pipeline with complete config
+        success = run_pipeline( config=config, dry_run=args.dry_run)
+        sys.exit(0 if success else 1)
 
-            # Run pipeline with complete config
-            success = run_pipeline( config=config, dry_run=args.dry_run)
-            sys.exit(0 if success else 1)
-
-        elif args.command == 'deduplicate':
-            # Create config dict with proper priority order
-            config = build_config(args)
-
-            # Run determine_duplicates with config
-            determine_duplicates(config=config)
-            print(f"Deduplication completed successfully. Results saved to: {args.prefix}")
-            sys.exit(0)
-
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    elif args.command == 'deduplicate':
+        # Create config dict with proper priority order
+        config = build_config(args)
+        # Run determine_duplicates with config
+        determine_duplicates(config=config)
+        print(f"Deduplication completed successfully. Results saved to: {args.prefix}")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

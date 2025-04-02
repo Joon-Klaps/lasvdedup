@@ -26,7 +26,6 @@ def sort_table(table_path: Path, length_column:str,
     Returns:
         DataFrame with contig IDs as index, containing reads, coverage and qlen columns
     """
-    logger.info("Loading read counts and coverage from %s", table_path)
 
     contigs_df = pd.read_csv(str(table_path), sep="\t")
     logger.info("Loaded table with %d rows and %d columns",
