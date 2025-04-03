@@ -37,7 +37,9 @@ def group_sequences_by_sample(tips: List, sample_regex: str) -> Dict[str, List[s
             no_match_count += 1
 
     if no_match_count > 0:
-        logger.warning("No sample ID match for %d sequences", no_match_count)
+        logger.error("No sample ID match for %d sequences", no_match_count)
+        logger.error("sample regex pattern: %s, %s", sample_regex, pattern )
+        sys.exit(1)
 
     logger.info("Found %d unique sample IDs", len(sample_to_seqs))
     # Log stats on sequences per sample

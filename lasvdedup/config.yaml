@@ -4,10 +4,10 @@ SEQ_DATA_DIR: ""   # Default empty, should be provided at runtime
 BASE_DATA_DIR: "https://raw.githubusercontent.com/Joon-Klaps/lasvdedup/refs/heads/main/lasvdedup/data/"
 OUTDIR: "lasvdedup-out"  # Default output directory
 WORKDIR: ".work"       # Working directory for Snakemake
-LOGLEVEL: "INFO"
+LOGLEVEL: "DEBUG"
 
 # Parallelization settings
-THREADS: 4        # Default threads for the whole pipeline
+THREADS: 8        # Default threads for the whole pipeline
 
 # Analysis parameters
 SPECIES: "LASV"
@@ -19,7 +19,7 @@ MAFFT:
 
 IQTREE:
   MODEL: "GTR+F+R9"
-  EXTRA_PARAMS: "-B 1000"
+  EXTRA_PARAMS: "--fast -v --keep-ident"
 
 # Sequence analysis settings
 DEDUPLICATE:
