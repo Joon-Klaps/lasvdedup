@@ -133,8 +133,13 @@ def write_results(
 
         # Write the sequence to a FASTA file
         if seq_name in sequences:
+            # Get a copy of the sequence record
+            seq_record = sequences[seq_name]
+            # Remove gap characters ('-') from the sequence
+            seq_record.seq = seq_record.seq.ungap('-')
+
             with open(output_path, "w") as fasta_file:
-                SeqIO.write(sequences[seq_name], fasta_file, "fasta")
+                SeqIO.write(seq_record, fasta_file, "fasta")
         else:
             logger.warning("Sequence %s not found in the provided FASTA file, skipping...", seq_name)
 
