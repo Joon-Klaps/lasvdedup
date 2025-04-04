@@ -27,31 +27,34 @@ def parse_args():
     run_parser = subparsers.add_parser('run', help='Run the full pipeline')
 
     # Required arguments for the run command
-    run_parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True,
+    run_parser.add_argument('--input', '--contigs-table', dest='contigs_table', required=True, type=str,
                       help='Path to contigs table (CSV/TSV format)')
 
     # Optional arguments for the run command
-    run_parser.add_argument('--seq-dir', '--seq-data-dir', dest='seq_data_dir',
+    run_parser.add_argument('--seq-dir', '--seq-data-dir', dest='seq_data_dir', type=str,
                       help='Directory containing sequence data')
-    run_parser.add_argument('--ref-dir', '--base-data-dir', dest='base_data_dir',
+    run_parser.add_argument('--ref-dir', '--base-data-dir', dest='base_data_dir', type=str,
                       help='Base URL or path for reference data')
-    run_parser.add_argument('--outdir', '-o', help='Output directory')
-    run_parser.add_argument('--workdir', '-w', help='Working directory')
-    run_parser.add_argument('--config', '-c', help='Path to config file')
+    run_parser.add_argument('--outdir', '-o', type=str, help='Output directory')
+    run_parser.add_argument('--workdir', '-w', type=str, help='Working directory')
+    run_parser.add_argument('--config', '-c', type=str, help='Path to config file')
     run_parser.add_argument('--threads', '-t', type=int, help='Number of threads to use')
     run_parser.add_argument('--force', '-f', action='store_true', help='Force rerun all jobs')
     run_parser.add_argument('--dry-run', '-n', action='store_true', help='Perform a dry run')
-    run_parser.add_argument("-l", "--log-level", help="The desired log level (default WARNING).", choices=("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"), default="WARNING")
+    run_parser.add_argument("-l", "--log-level", type=str,
+                      help="The desired log level (default WARNING).",
+                      choices=("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"),
+                      default="WARNING")
 
     # Deduplicate command
     dedup_parser = subparsers.add_parser('deduplicate', help='Run just the deduplication step')
 
     # Required arguments for the deduplicate command
-    dedup_parser.add_argument('--tree', '-t', required=True, type=Path,
+    dedup_parser.add_argument('--tree', '-t', required=True, type=str,
                        help='Path to the phylogenetic tree file')
-    dedup_parser.add_argument('--sequences', '-s', required=True, type=Path,
+    dedup_parser.add_argument('--sequences', '-s', required=True, type=str,
                        help='Path to sequences FASTA file')
-    dedup_parser.add_argument('--table', '-i', required=True, type=Path,
+    dedup_parser.add_argument('--table', '-i', required=True, type=str,
                        help='Path to the contigs table')
     dedup_parser.add_argument('--prefix', '-o', required=True, type=str,
                        help='Output directory prefix')
@@ -61,6 +64,8 @@ def parse_args():
                        help='Regular expression to extract sample identifiers')
     dedup_parser.add_argument('--length-column', type=str,
                        help='Name of the column containing consensus length')
+    dedup_parser.add_argument('--selection-column', type=str,
+                       help='Comma-separated list of columns used for selecting best duplicates')
     dedup_parser.add_argument('--species', type=str,
                        help='Species name for output files')
     dedup_parser.add_argument('--segment', type=str,
@@ -69,15 +74,16 @@ def parse_args():
                        help='Override pairwise distance threshold for intrahost variation')
     dedup_parser.add_argument('--z-threshold', type=float,
                        help='Override z threshold for intrahost variation')
-    dedup_parser.add_argument('--clade-size', type=float,
+    dedup_parser.add_argument('--clade-size', type=int,
                        help='Override clade size threshold for intrahost variation')
-    dedup_parser.add_argument('--target-length', type=float,
+    dedup_parser.add_argument('--target-length', type=int,
                        help='Override target length for intrahost variation')
     dedup_parser.add_argument('--config', '-c', type=str,
                        help='Path to configuration file with segment-specific thresholds')
     dedup_parser.add_argument(
         "-l",
         "--log-level",
+        type=str,
         help="The desired log level (default WARNING).",
         choices=("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"),
         default="WARNING",
