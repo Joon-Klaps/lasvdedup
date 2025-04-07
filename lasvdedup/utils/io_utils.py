@@ -135,7 +135,8 @@ def write_results(
         if seq_name in sequences:
             # Get a copy of the sequence record
             seq_record = sequences[seq_name]
-            seq_record.seq = seq_record.replace("-", "")
+
+            seq_record.seq = seq_record.seq.replace("-", "")
 
             with open(output_path, "w") as fasta_file:
                 SeqIO.write(seq_record, fasta_file, "fasta")

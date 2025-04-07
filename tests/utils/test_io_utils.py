@@ -4,6 +4,8 @@ import tempfile
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 from unittest.mock import patch, MagicMock
 
 from lasvdedup.utils.io_utils import (
@@ -88,9 +90,15 @@ def test_write_results():
 
     # Mock sequences
     sequences = {
-        'seq1': MagicMock(),
-        'seq2': MagicMock(),
-        'seq3': MagicMock()
+        'seq1': SeqRecord(Seq("----CTGCAGAACAAACTGGCGCCGAGC---"),
+                   id="seq1", name="seq1",
+                   description="mock sequence"),
+        'seq2': SeqRecord(Seq("----CTGCAGACCCCCAAACTGGCGCCGAGC---"),
+                   id="seq2", name="seq2",
+                   description="mock sequence"),
+        'seq3': SeqRecord(Seq("AT---CTGCAGACCCCCAAACTGGCGCCGAGC---"),
+                   id="seq3", name="seq3",
+                   description="mock sequence"),
     }
 
     with tempfile.TemporaryDirectory() as tmpdir:
