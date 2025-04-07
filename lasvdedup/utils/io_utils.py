@@ -135,8 +135,7 @@ def write_results(
         if seq_name in sequences:
             # Get a copy of the sequence record
             seq_record = sequences[seq_name]
-            # Remove gap characters ('-') from the sequence
-            seq_record.seq = seq_record.seq.ungap('-')
+            seq_record.seq = seq_record.replace("-", "")
 
             with open(output_path, "w") as fasta_file:
                 SeqIO.write(seq_record, fasta_file, "fasta")
