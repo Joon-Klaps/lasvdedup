@@ -98,7 +98,7 @@ rule build_tree:
         prefix=lambda wildcards: f"{wildcards.OUTDIR}/iqtree-out/{wildcards.species}-{wildcards.segment}.denovo.trimal".replace(" ",""),
         model=lambda _: config["IQTREE"]["MODEL"],
         extra_args=lambda _: config["IQTREE"].get("EXTRA_PARAMS", ""),
-    threads: workflow.cores
+    threads: lambda _: max(1, int(workflow.cores / len(SEGMENTS)))
     shell:
         """
         mkdir -p {wildcards.OUTDIR}/iqtree-out/
