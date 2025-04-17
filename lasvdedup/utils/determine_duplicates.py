@@ -91,15 +91,16 @@ def determine_duplicates(
         raise ValueError("Species not provided in config or CLI arguments")
 
     # Setup logging
-    log_level = config.get("LOGLEVEL", "INFO")
-    setup_logging(level=getattr(logging, log_level) if isinstance(log_level, str) else log_level,
+    setup_logging(level="INFO",
                  filepath=str(prefix / f"{species}-{segment}.log"))
 
     # Log start of the process with parameters
-    logger.info("Starting duplicate detection process")
+    logger.info("Starting duplicate detection process.")
 
     if (thresholds := config.get("DEDUPLICATE", {}).get("THRESHOLDS", {}).get(segment)) is None:
         logger.error(f"No thresholds found for segment {segment}")
+
+    thresholds = {k:float(v) for k,v in thresholds.items()}
 
     logger.info("Using thresholds for segment %s: %s", segment, thresholds)
 
