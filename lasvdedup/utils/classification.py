@@ -132,8 +132,8 @@ class Classification:
         Returns:
             Header line string
         """
-        fields = ["sequence_name", "classification", "decision_category",
-                "sample_id", "contig_stats", "group_members", "reason",]
+        fields = ["sequence_name", "classification", "decision_category","contig_stats",
+                "sample_id", "group_members", "reason",]
         return delimiter.join(fields)
 
     @staticmethod
