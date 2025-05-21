@@ -24,7 +24,7 @@ IQTREE:
 # Sequence analysis settings
 DEDUPLICATE:
   SAMPLE_REGEX: "LVE[0-9]{5}"
-  LENGTH_COLUMN: "(annotation) qlen"
+  LENGTH_COLUMN: "(annotation) length"
   SELECTION_COLUMNS:
     - "(samtools Post-dedup) reads mapped (R1+R2)"
     - "(general_stats) mosdepth 10X coverage"

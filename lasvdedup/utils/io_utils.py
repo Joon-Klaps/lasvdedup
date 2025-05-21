@@ -24,7 +24,7 @@ def sort_table(table_path: Path, length_column:str,
         expected_length: Target length to filter contigs
 
     Returns:
-        DataFrame with contig IDs as index, containing reads, coverage and qlen columns
+        DataFrame with contig IDs as index, containing reads, coverage and alignment length columns
     """
 
     contigs_df = pd.read_csv(str(table_path), sep="\t")
